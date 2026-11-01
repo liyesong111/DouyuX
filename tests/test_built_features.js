@@ -188,7 +188,7 @@ async function main() {
         team50Chip.dispatchEvent(new win.Event("click", { bubbles: true }));
 
         const iframe = lvjiangModal.querySelector(".lvjiang-modal__iframe");
-        assert.ok(iframe.src.indexOf("team=50") !== -1, "切换战队后 iframe.src 必须加载 team=50 对应链接");
+        assert.ok(iframe.src.indexOf("team=50") !== -1 || iframe.src.indexOf("/teams/50/") !== -1, "切换战队后 iframe.src 必须加载 team 50 对应链接");
     }
 
     // 验证监控室查询入口与独立查询面板

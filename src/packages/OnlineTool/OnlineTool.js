@@ -70,7 +70,7 @@ var LVJIANG_STREAMERS = LVJIANG_TEAMS.map(function (t) {
 
 var LVJIANG_PAGES = {
   schedule: { title: "赛程", url: "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3" },
-  teams: { title: "阵容", url: "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3" },
+  teams: { title: "阵容", url: "https://xinlvjiang.icu/teams/49/?event=lvjiangbeiS3&team=49&return_to=%2F%3Fevent%3DlvjiangbeiS3" },
   players: { title: "选手", url: "https://xinlvjiang.icu/players/?event=lvjiangbeiS3&page_size=20" },
   leaderboards: { title: "选手榜", url: "https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" },
   live: { title: "直播", url: "https://xinlvjiang.icu/live/?event=lvjiangbeiS3" }
@@ -248,7 +248,7 @@ function switchLvjiangTab(key, teamId) {
   if (extBtn && LVJIANG_PAGES[key]) {
     var pageUrl = LVJIANG_PAGES[key].url;
     if (key === "teams") {
-      pageUrl = "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3&team=" + currentLvjiangTeamId;
+      pageUrl = "https://xinlvjiang.icu/teams/" + currentLvjiangTeamId + "/?event=lvjiangbeiS3&team=" + currentLvjiangTeamId + "&return_to=%2F%3Fevent%3DlvjiangbeiS3";
     }
     extBtn.href = pageUrl;
   }
@@ -267,7 +267,7 @@ function loadLvjiangContent(key, forceReload, teamId) {
   var targetUrl = LVJIANG_PAGES[key].url;
   if (key === "teams") {
     var tid = teamId || currentLvjiangTeamId || "49";
-    targetUrl = "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3&team=" + tid;
+    targetUrl = "https://xinlvjiang.icu/teams/" + tid + "/?event=lvjiangbeiS3&team=" + tid + "&return_to=%2F%3Fevent%3DlvjiangbeiS3";
   }
 
   var extBtn = modal.querySelector(".lvjiang-modal__external-btn");
