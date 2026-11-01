@@ -19,8 +19,6 @@ const EX_MENU_SURFACE_EXTRA = [
   ".ex-gift-picker-modal",          /* 扩展功能里再打开的礼物选择器 */
   ".ex-gift-picker-mask",           /* 它的遮罩：点遮罩由选择器自己收，不连带收走原有面板 */
   ".ex-pip-menu-root",              /* 加强版画中画菜单 */
-  ".lvjiang-modal",                 /* 驴酱杯大屏弹窗 */
-  ".lvjiang-backdrop",              /* 驴酱杯大屏遮罩 */
   "[data-ex-menu-layer]"            /* 运行期追加的次级菜单层（ExPanel_markMenuLayer 打标记） */
 ];
 

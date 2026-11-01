@@ -171,51 +171,15 @@ async function main() {
         assert.strictEqual(a.getAttribute("target"), "_blank", "快捷按钮必须在新标签页打开（target=_blank）");
     });
 
-    // 验证驴酱杯大屏 16 支战队直达与赛程阶段/视图切换
+    // 验证驴酱杯纯净外链直跳：原页面不内嵌 iframe，单纯新标签页跳转官网
+    let openedUrl = "";
+    win.open = function (url) { openedUrl = url; return {}; };
     if (typeof win.openLvjiangModal === "function") {
         win.openLvjiangModal("teams");
-        const lvjiangModal = win.document.querySelector(".lvjiang-modal");
-        assert.ok(lvjiangModal, "大屏模态框必须已挂载");
-        const liveTab = lvjiangModal.querySelector('.lvjiang-modal__tab[data-key="live"]');
-        assert.ok(liveTab, "大屏内必须包含「直播」Tab");
-
-        const teamChips = lvjiangModal.querySelectorAll(".lvjiang-modal__team-chip");
-        assert.strictEqual(teamChips.length, 16, "大屏阵容栏必须包含 16 支战队直达按钮");
-
-        // 模拟切换至火星包队（team 50）
-        const team50Chip = lvjiangModal.querySelector('.lvjiang-modal__team-chip[data-team-id="50"]');
-        assert.ok(team50Chip, "必须包含火星包队（team=50）的直达按钮");
-        team50Chip.dispatchEvent(new win.Event("click", { bubbles: true }));
-
-        const iframe = lvjiangModal.querySelector(".lvjiang-modal__iframe");
-        assert.ok(iframe.src.indexOf("team=50") !== -1 || iframe.src.indexOf("/teams/50/") !== -1, "切换战队后 iframe.src 必须加载 team 50 对应链接");
-
-        // 模拟切换至赛程 Tab
-        const scheduleTab = lvjiangModal.querySelector('.lvjiang-modal__tab[data-key="schedule"]');
-        assert.ok(scheduleTab, "大屏内必须包含「赛程」Tab");
-        scheduleTab.dispatchEvent(new win.Event("click", { bubbles: true }));
-
-        const scheduleBar = lvjiangModal.querySelector(".lvjiang-modal__schedule-bar");
-        assert.ok(scheduleBar, "大屏内必须包含赛程阶段与视图控制栏 .lvjiang-modal__schedule-bar");
-        assert.ok(scheduleBar.classList.contains("is-visible"), "赛程栏在切换至赛程 Tab 后必须立即可见");
-
-        const stageChips = scheduleBar.querySelectorAll(".lvjiang-modal__stage-chip");
-        assert.strictEqual(stageChips.length, 2, "赛程栏必须包含 2 个阶段选项（瑞士轮与淘汰赛）");
-
-        const viewChips = scheduleBar.querySelectorAll(".lvjiang-modal__view-chip");
-        assert.strictEqual(viewChips.length, 2, "赛程栏必须包含 2 个视图选项（列表与晋级图）");
-
-        // 切换至淘汰赛
-        const playoffChip = scheduleBar.querySelector('.lvjiang-modal__stage-chip[data-stage="playoff"]');
-        assert.ok(playoffChip, "必须包含淘汰赛按钮");
-        playoffChip.dispatchEvent(new win.Event("click", { bubbles: true }));
-        assert.ok(iframe.src.indexOf("stage=playoff") !== -1, "切换至淘汰赛后 iframe.src 必须包含 stage=playoff，实际：" + iframe.src);
-
-        // 切换至列表视图
-        const listViewChip = scheduleBar.querySelector('.lvjiang-modal__view-chip[data-view="list"]');
-        assert.ok(listViewChip, "必须包含列表视图按钮");
-        listViewChip.dispatchEvent(new win.Event("click", { bubbles: true }));
-        assert.ok(iframe.src.indexOf("view=list") !== -1 && iframe.src.indexOf("stage=playoff") !== -1, "切换至列表后 iframe.src 必须包含 view=list 与 stage=playoff，实际：" + iframe.src);
+        assert.strictEqual(openedUrl, "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3", "openLvjiangModal 必须直接打开阵容官网");
+        win.openLvjiangModal("schedule");
+        assert.strictEqual(openedUrl, "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3", "openLvjiangModal 必须直接打开赛程官网");
+        assert.strictEqual(win.document.querySelector(".lvjiang-modal"), null, "站内绝不生成 .lvjiang-modal 模态框 DOM");
     }
 
     // 验证监控室查询入口与独立查询面板
