@@ -6,7 +6,7 @@ try { JSDOM = require("jsdom").JSDOM; } catch (e) { console.error("[测试] 缺�
 
 const ROOT = path.join(__dirname, "..");
 const EXPANEL_SRC = fs.readFileSync(path.join(ROOT, "src/packages/XPanel/XPanel.js"), "utf8");
-const EXICON_SRC = fs.readFileSync(path.join(ROOT, "src/packages/ExIcon/ExIcon.js"), "utf8");
+const EXICON_SRC = fs.readFileSync(path.join(ROOT, "src/packages/XIcon/XIcon.js"), "utf8");
 const EXICON_FN_SRC = EXICON_SRC.slice(EXICON_SRC.indexOf("function initPkg_ExIcon_Func()"));
 
 /**

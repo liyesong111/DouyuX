@@ -321,115 +321,58 @@ function initRouter_Xinlvjiang() {
             "    box-shadow: 0 10px 28px rgba(215, 184, 117, 0.35) !important;",
             "    z-index: 5 !important;",
             "}",
-            "/* 资料快览弹窗（图 2 模态框）：强制绝对固定居中、暗黑毛玻璃背景、金边与大阴影 */",
-            ".profile-preview-dialog,",
+            "/* 彻底屏蔽快览弹窗与原生 dialog 白色背景闪烁，确保卡片直达详细资料 */",
             "dialog.profile-preview-dialog,",
-            "[data-profile-dialog] {",
-            "    position: fixed !important;",
-            "    top: 50% !important;",
-            "    left: 50% !important;",
-            "    transform: translate(-50%, -50%) !important;",
-            "    width: min(980px, calc(100vw - 24px)) !important;",
-            "    max-height: calc(100vh - 36px) !important;",
-            "    background: rgba(20, 22, 27, 0.98) !important;",
-            "    border: 1px solid rgba(215, 184, 117, 0.4) !important;",
-            "    border-radius: 16px !important;",
-            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.92) !important;",
-            "    backdrop-filter: blur(24px) !important;",
-            "    -webkit-backdrop-filter: blur(24px) !important;",
-            "    z-index: 2147483647 !important;",
-            "    overflow-y: auto !important;",
-            "    padding: 0 !important;",
-            "    margin: 0 !important;",
-            "}",
-            "/* 自建高兼容遮罩层 */",
+            ".profile-preview-dialog,",
+            "[data-profile-dialog],",
             ".lvjiang-custom-backdrop {",
-            "    position: fixed !important;",
-            "    inset: 0 !important;",
-            "    background: rgba(0, 0, 0, 0.78) !important;",
-            "    backdrop-filter: blur(6px) !important;",
-            "    -webkit-backdrop-filter: blur(6px) !important;",
-            "    z-index: 2147483646 !important;",
-            "    display: none;",
+            "    display: none !important;",
+            "    opacity: 0 !important;",
+            "    visibility: hidden !important;",
+            "    pointer-events: none !important;",
+            "    width: 0 !important;",
+            "    height: 0 !important;",
+            "    border: none !important;",
+            "    background: transparent !important;",
             "}",
-            ".lvjiang-custom-backdrop.is-active {",
-            "    display: block !important;",
+            "dialog::backdrop,",
+            "dialog.profile-preview-dialog::backdrop,",
+            ".profile-preview-dialog::backdrop,",
+            "[data-profile-dialog]::backdrop {",
+            "    display: none !important;",
+            "    opacity: 0 !important;",
+            "    background: transparent !important;",
             "}",
-            ".profile-preview-toolbar {",
-            "    background: rgba(26, 28, 34, 0.96) !important;",
-            "    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;",
-            "    position: sticky !important;",
-            "    top: 0 !important;",
-            "    z-index: 10 !important;",
+            "/* 选手详情页返回条 */",
+            ".profile-return-row {",
+            "    background: rgba(26, 28, 34, 0.92) !important;",
+            "    border: 1px solid rgba(255, 136, 0, 0.35) !important;",
+            "    border-radius: 10px !important;",
+            "    padding: 12px 20px !important;",
+            "    margin: 10px auto 20px !important;",
+            "    max-width: 1240px !important;",
+            "    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;",
             "    display: flex !important;",
             "    align-items: center !important;",
-            "    justify-content: space-between !important;",
-            "    padding: 12px 20px !important;",
-            "}",
-            ".profile-preview-toolbar span {",
-            "    color: #CBD5E1 !important;",
-            "    font-weight: 600 !important;",
-            "    font-size: 15px !important;",
-            "}",
-            ".profile-preview-close {",
-            "    background: rgba(255, 255, 255, 0.08) !important;",
-            "    border: 1px solid rgba(255, 255, 255, 0.15) !important;",
-            "    color: #CBD5E1 !important;",
-            "    width: 32px !important;",
-            "    height: 32px !important;",
-            "    border-radius: 50% !important;",
-            "    cursor: pointer !important;",
-            "    display: inline-flex !important;",
-            "    align-items: center !important;",
-            "    justify-content: center !important;",
-            "    font-size: 18px !important;",
-            "    line-height: 1 !important;",
-            "}",
-            ".profile-preview-close:hover {",
-            "    background: rgba(255, 102, 0, 0.25) !important;",
-            "    border-color: #FF6600 !important;",
-            "    color: #FF6600 !important;",
-            "}",
-            "/* 查看详情按钮高质感橙金渐变 */",
-            ".profile-preview-actions .button,",
-            ".profile-preview-actions a.button,",
-            ".profile-preview-actions a {",
-            "    background: linear-gradient(135deg, #FF7700, #E65100) !important;",
-            "    color: #FFFFFF !important;",
-            "    border: 1px solid rgba(255, 255, 255, 0.25) !important;",
-            "    border-radius: 8px !important;",
-            "    font-weight: 600 !important;",
-            "    box-shadow: 0 4px 14px rgba(230, 81, 0, 0.45) !important;",
-            "    cursor: pointer !important;",
-            "    padding: 8px 18px !important;",
-            "    text-decoration: none !important;",
-            "    display: inline-block !important;",
-            "    transition: all 0.2s ease !important;",
-            "}",
-            ".profile-preview-actions .button:hover,",
-            ".profile-preview-actions a.button:hover,",
-            ".profile-preview-actions a:hover {",
-            "    background: linear-gradient(135deg, #FF8800, #F57C00) !important;",
-            "    box-shadow: 0 6px 18px rgba(255, 136, 0, 0.65) !important;",
-            "    transform: translateY(-1px) !important;",
-            "}",
-            "/* 选手详情页返回条美化 */",
-            ".profile-return-row {",
-            "    background: rgba(26, 28, 34, 0.85) !important;",
-            "    border: 1px solid rgba(255, 255, 255, 0.08) !important;",
-            "    border-radius: 10px !important;",
-            "    padding: 12px 18px !important;",
-            "    margin-bottom: 20px !important;",
+            "    position: sticky !important;",
+            "    top: 10px !important;",
+            "    z-index: 100 !important;",
             "}",
             ".back-link {",
             "    color: #FF8800 !important;",
-            "    font-weight: 600 !important;",
+            "    font-weight: 700 !important;",
+            "    font-size: 15px !important;",
             "    text-decoration: none !important;",
             "    cursor: pointer !important;",
+            "    display: inline-flex !important;",
+            "    align-items: center !important;",
+            "    gap: 6px !important;",
+            "    transition: all 0.2s ease !important;",
             "}",
             ".back-link:hover {",
-            "    text-decoration: underline !important;",
+            "    text-decoration: none !important;",
             "    color: #FFAA33 !important;",
+            "    transform: translateX(-3px) !important;",
             "}",
             "@keyframes ex-spin {",
             "    0% { transform: rotate(0deg); }",
@@ -440,8 +383,24 @@ function initRouter_Xinlvjiang() {
     }
 
     function bindInteractions() {
-        // 统一可靠的页面跳转执行器（覆盖 unsafeWindow / window / location 三重沙箱环境）
-        function jumpToPlayer(destUrl) {
+        // 1. 彻底禁用原生 dialog 弹出，从根源掐死白色底色闪烁
+        function suppressNativeDialog() {
+            try {
+                var dialogs = document.querySelectorAll("dialog, [data-profile-dialog]");
+                for (var i = 0; i < dialogs.length; i++) {
+                    var d = dialogs[i];
+                    if (d.open) {
+                        try { d.close(); } catch (_) {}
+                    }
+                    d.showModal = function () {};
+                    d.show = function () {};
+                }
+            } catch (_) {}
+        }
+        suppressNativeDialog();
+
+        // 2. 统一可靠的跨域 iframe 内部导航执行器
+        function safeNavigate(destUrl) {
             if (!destUrl) return;
             var fullUrl = destUrl;
             try {
@@ -449,47 +408,89 @@ function initRouter_Xinlvjiang() {
             } catch (_) {
                 fullUrl = destUrl;
             }
+
+            // 优先路线：原生 DOM <a> 锚点分发（携带用户激活上下文，穿透沙箱，iframe 内部平滑跳转）
             try {
-                if (typeof unsafeWindow !== "undefined" && unsafeWindow.location) {
-                    unsafeWindow.location.href = fullUrl;
-                    return;
-                }
+                var tempLink = document.createElement("a");
+                tempLink.href = fullUrl;
+                tempLink.target = "_self";
+                tempLink.style.cssText = "display:none!important;position:absolute;left:-9999px;top:-9999px;";
+                (document.body || document.documentElement).appendChild(tempLink);
+                tempLink.click();
+                setTimeout(function () {
+                    try { if (tempLink.parentNode) tempLink.parentNode.removeChild(tempLink); } catch (_) {}
+                }, 200);
             } catch (_) {}
-            try {
-                window.location.href = fullUrl;
-                return;
-            } catch (_) {}
+
+            // 兜底路线：标准 window.location.assign / href
             try {
                 window.location.assign(fullUrl);
-                return;
-            } catch (_) {}
-            try {
-                location.href = fullUrl;
-            } catch (_) {}
-        }
-
-        // 彻底拆除原站对 a[data-profile-preview] 的弹窗劫持，确保链接直接回落或被接管直达详情
-        function neutraliseProfilePreview(root) {
-            var scope = root || document;
-            var previewLinks = scope.querySelectorAll("[data-profile-preview]");
-            for (var i = 0; i < previewLinks.length; i++) {
-                previewLinks[i].removeAttribute("data-profile-preview");
-                previewLinks[i].removeAttribute("aria-haspopup");
+            } catch (_) {
+                try {
+                    window.location.href = fullUrl;
+                } catch (_) {
+                    try {
+                        location.href = fullUrl;
+                    } catch (_) {}
+                }
             }
         }
-        neutraliseProfilePreview();
 
-        // 监听动态渲染卡片（如翻页、切换分组、筛选），持续剥离弹窗标记
+        // 3. 剥离卡片上原站绑定的 data-profile-preview 与 aria-haspopup 属性，防止原站脚本劫持
+        function sanitizeCards(root) {
+            var scope = root || document;
+            var elements = scope.querySelectorAll(".player-card, a.player-card-link, [data-profile-preview], [data-entrant-card]");
+            for (var i = 0; i < elements.length; i++) {
+                var el = elements[i];
+                el.removeAttribute("data-profile-preview");
+                el.removeAttribute("aria-haspopup");
+                if (el.tagName === "A") {
+                    el.target = "_self";
+                }
+            }
+        }
+        sanitizeCards();
+
+        // 4. 选手详情独立页面自动插入顶部“返回”导航条
+        function ensureReturnBar() {
+            if (document.querySelector(".profile-return-row")) return;
+            var container = document.querySelector("#main, .player-dossier, .site-main");
+            if (!container) return;
+
+            var returnUrl = "";
+            try {
+                var sp = new URLSearchParams(window.location.search);
+                returnUrl = sp.get("return_to") || "";
+            } catch (_) {}
+            if (!returnUrl) {
+                returnUrl = "/teams/?event=lvjiangbeiS3";
+            }
+
+            var row = document.createElement("div");
+            row.className = "profile-return-row";
+            row.innerHTML = '<a class="back-link" href="' + returnUrl + '">← 返回（阵容 / 选手列表）</a>';
+            container.insertBefore(row, container.firstChild);
+        }
+
+        if (window.location.pathname.indexOf("/players/") !== -1 || document.querySelector(".player-dossier")) {
+            ensureReturnBar();
+        }
+
+        // 5. 持续监听 DOM 变化：动态卡片挂载即刻消毒、dialog 即刻压制
         if (typeof MutationObserver !== "undefined") {
             try {
                 var observer = new MutationObserver(function (mutations) {
+                    suppressNativeDialog();
                     for (var m = 0; m < mutations.length; m++) {
                         var mutation = mutations[m];
                         if (mutation.addedNodes && mutation.addedNodes.length > 0) {
                             for (var n = 0; n < mutation.addedNodes.length; n++) {
                                 var node = mutation.addedNodes[n];
                                 if (node.nodeType === 1) {
-                                    neutraliseProfilePreview(node);
+                                    sanitizeCards(node);
+                                    if (window.location.pathname.indexOf("/players/") !== -1 || node.querySelector && node.querySelector(".player-dossier")) {
+                                        ensureReturnBar();
+                                    }
                                 }
                             }
                         }
@@ -499,36 +500,36 @@ function initRouter_Xinlvjiang() {
             } catch (_) {}
         }
 
-        // 核心：捕获阶段拦截卡片点击，100% 穿透直达选手详细资料页
+        // 6. 核心：捕获阶段拦截卡片点击，100% 穿透直达选手详细资料页
         document.addEventListener("click", function (e) {
             if (!e.target) return;
 
-            // 1. 直播间跳转按钮（.card-room-entry）放行，确保正常打开主播房间
+            // ① 直播间跳转按钮（.card-room-entry）放行，供用户在新标签页打开主播房间
             if (e.target.closest && e.target.closest(".card-room-entry")) {
                 return;
             }
 
-            // 2. 表单输入控件、对比选择复选框放行，供用户正常交互
+            // ② 表单输入控件、对比选择复选框放行
             if (e.target.closest && e.target.closest("input, select, textarea, label.catalog-compare-choice, button[data-catalog-dimension-sort]")) {
                 return;
             }
 
-            // 3. 选手详情页中的返回链接（← 返回选手 / ← 返回阵容）平滑回退
+            // ③ 选手详情页中的返回链接（← 返回阵容 / ← 返回选手）平滑回退
             var backBtn = e.target.closest && e.target.closest(".back-link, .profile-return-row a");
             if (backBtn) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-                var backTarget = backBtn.href || backBtn.getAttribute("href");
+                var backTarget = backBtn.getAttribute("href") || backBtn.href;
                 if (backTarget) {
-                    jumpToPlayer(backTarget);
+                    safeNavigate(backTarget);
                 } else if (window.history && window.history.length > 1) {
                     window.history.back();
                 }
                 return;
             }
 
-            // 4. 处于选手卡片（.player-card）区域内的点击
+            // ④ 处于选手卡片（.player-card）区域内的点击
             var card = e.target.closest && e.target.closest(".player-card");
             if (!card) return;
 
@@ -544,7 +545,7 @@ function initRouter_Xinlvjiang() {
 
             // 提取目标选手详细信息 URL
             var link = card.querySelector("a.player-card-link") || card.querySelector("a[href*='/players/']");
-            var destUrl = link ? (link.href || link.getAttribute("href")) : "";
+            var destUrl = link ? (link.getAttribute("href") || link.href) : "";
 
             // 如果链接未挂载 href，通过卡片的 data-entrant-card 构建官方标准直达链接
             if (!destUrl && card.dataset && card.dataset.entrantCard) {
@@ -554,12 +555,13 @@ function initRouter_Xinlvjiang() {
             }
 
             if (destUrl) {
+                // 阻断原站对点击的错误弹窗劫持，通过安全导航器直接直达选手详细资料页
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof e.stopImmediatePropagation === "function") {
                     e.stopImmediatePropagation();
                 }
-                jumpToPlayer(destUrl);
+                safeNavigate(destUrl);
             }
         }, true);
 
@@ -568,13 +570,13 @@ function initRouter_Xinlvjiang() {
             var card = e.target.closest && e.target.closest(".player-card");
             if (card && (!card.classList || !card.classList.contains("catalog-style-card"))) {
                 var link = card.querySelector("a.player-card-link") || card.querySelector("a[href*='/players/']");
-                var destUrl = link ? (link.href || link.getAttribute("href")) : "";
+                var destUrl = link ? (link.getAttribute("href") || link.href) : "";
                 if (!destUrl && card.dataset && card.dataset.entrantCard) {
                     destUrl = "https://xinlvjiang.icu/players/" + card.dataset.entrantCard + "/?event=lvjiangbeiS3";
                 }
                 if (destUrl) {
                     e.preventDefault();
-                    jumpToPlayer(destUrl);
+                    safeNavigate(destUrl);
                 }
             }
         }, true);

@@ -24,7 +24,7 @@ function readSrc(rel) {
     return text;
 }
 
-const EXGUARD_SRC = readSrc("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = readSrc("src/require/XGuard/XGuard.js");
 const MEM_SRC = readSrc("src/packages/ChatTools/ChatMemory/ChatMemory.js");
 
 function makeEnv() {

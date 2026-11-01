@@ -3,7 +3,7 @@ const path = require("path");
 const assert = require("assert");
 
 const ROOT = path.join(__dirname, "..");
-const GUARD_PATH = path.join(ROOT, "src/require/ExGuard/ExGuard.js");
+const GUARD_PATH = path.join(ROOT, "src/require/XGuard/XGuard.js");
 const SRC = fs.readFileSync(GUARD_PATH, "utf8");
 const BUILT_PATH = fs.existsSync(path.join(ROOT, "DouyuX.user.js"))
   ? path.join(ROOT, "DouyuX.user.js")

@@ -24,7 +24,7 @@ function readSrc(rel) {
     return text;
 }
 
-const EXGUARD_SRC = readSrc("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = readSrc("src/require/XGuard/XGuard.js");
 const UPDATE_SRC = readSrc("src/packages/Update/Update.js");
 const CUR = String(require("../package.json").version || "2026.09.29.01");
 function bump(v) {

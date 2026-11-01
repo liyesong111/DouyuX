@@ -2,6 +2,7 @@
 
 > **极致纯净 · 流畅观播**。DouyuX 致力于为斗鱼网页端带来纯净、流畅、高效的观播体验。原生同屏多路分屏、最高画质秒开直达、驴酱杯赛事数据直达。
 
+[![Tampermonkey](https://img.shields.io/badge/Tampermonkey-Install-00485B?style=flat-square&logo=tampermonkey)](https://github.com/liyesong111/DouyuX/raw/main/DouyuX.user.js)
 [![GitHub release](https://img.shields.io/github/v/release/liyesong111/DouyuX?color=blue&style=flat-square)](https://github.com/liyesong111/DouyuX/releases)
 [![Tests Passing](https://img.shields.io/badge/tests-passing-success?style=flat-square)](https://github.com/liyesong111/DouyuX)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
