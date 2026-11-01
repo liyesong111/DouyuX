@@ -3294,7 +3294,8 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     width: 100% !important;
     height: 100% !important;
     border: none !important;
-    background: transparent !important;
+    background: #141518 !important;
+    color-scheme: dark !important;
 }
 
 .lvjiang-modal__loading {
