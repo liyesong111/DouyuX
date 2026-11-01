@@ -69,7 +69,7 @@ var LVJIANG_STREAMERS = LVJIANG_TEAMS.map(function (t) {
 });
 
 var LVJIANG_PAGES = {
-  schedule: { title: "赛程", url: "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3" },
+  schedule: { title: "赛程", url: "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3&stage=swiss&view=bracket" },
   teams: { title: "阵容", url: "https://xinlvjiang.icu/teams/49/?event=lvjiangbeiS3&team=49&return_to=%2F%3Fevent%3DlvjiangbeiS3" },
   players: { title: "选手", url: "https://xinlvjiang.icu/players/?event=lvjiangbeiS3&page_size=20" },
   leaderboards: { title: "选手榜", url: "https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" },
@@ -78,6 +78,60 @@ var LVJIANG_PAGES = {
 
 var currentLvjiangKey = "schedule";
 var currentLvjiangTeamId = "49";
+var currentScheduleStage = "swiss";
+var currentScheduleView = "bracket";
+
+function getScheduleUrl(stage, view) {
+  var s = stage || currentScheduleStage || "swiss";
+  var v = view || currentScheduleView || "bracket";
+  return "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3&stage=" + s + "&view=" + v;
+}
+
+function updateActiveScheduleChips(stage, view) {
+  var modal = document.querySelector(".lvjiang-modal");
+  if (!modal) return;
+  if (stage) {
+    currentScheduleStage = stage;
+    var stageChips = modal.querySelectorAll(".lvjiang-modal__stage-chip");
+    stageChips.forEach(function (chip) {
+      if (chip.getAttribute("data-stage") === stage) {
+        chip.classList.add("is-active");
+      } else {
+        chip.classList.remove("is-active");
+      }
+    });
+  }
+  if (view) {
+    currentScheduleView = view;
+    var viewChips = modal.querySelectorAll(".lvjiang-modal__view-chip");
+    viewChips.forEach(function (chip) {
+      if (chip.getAttribute("data-view") === view) {
+        chip.classList.add("is-active");
+      } else {
+        chip.classList.remove("is-active");
+      }
+    });
+  }
+}
+
+if (typeof window !== "undefined" && !window.__douyux_lvjiang_msg_bound) {
+  window.__douyux_lvjiang_msg_bound = true;
+  window.addEventListener("message", function (e) {
+    if (!e || !e.data) return;
+    if (e.data.type === "lvjiang_schedule_sync") {
+      if (e.data.stage) currentScheduleStage = e.data.stage;
+      if (e.data.view) currentScheduleView = e.data.view;
+      updateActiveScheduleChips(e.data.stage, e.data.view);
+      var extBtn = document.querySelector(".lvjiang-modal__external-btn");
+      if (extBtn && currentLvjiangKey === "schedule") {
+        extBtn.href = getScheduleUrl(currentScheduleStage, currentScheduleView);
+      }
+    } else if (e.data.type === "lvjiang_url_change" && e.data.url) {
+      var extBtn2 = document.querySelector(".lvjiang-modal__external-btn");
+      if (extBtn2) extBtn2.href = e.data.url;
+    }
+  });
+}
 
 function getInitialLvjiangTeamId() {
   var curRid = (typeof getRoomId === "function") ? String(getRoomId()) : "";
@@ -151,6 +205,34 @@ function createLvjiangModal() {
         </button>
       </div>
     </div>
+    <div class="lvjiang-modal__schedule-bar" id="lvjiang-modal__schedule-bar">
+      <div class="lvjiang-modal__schedule-group">
+        <span class="lvjiang-modal__schedule-label">赛事阶段：</span>
+        <div class="lvjiang-modal__schedule-chips">
+          <button type="button" class="lvjiang-modal__stage-chip is-active" data-stage="swiss" title="瑞士轮 (16进8)">
+            <span class="lvjiang-modal__stage-badge">16进8</span>
+            <span class="lvjiang-modal__stage-text">瑞士轮</span>
+          </button>
+          <button type="button" class="lvjiang-modal__stage-chip" data-stage="playoff" title="淘汰赛 (八强争冠)">
+            <span class="lvjiang-modal__stage-badge">八强争冠</span>
+            <span class="lvjiang-modal__stage-text">淘汰赛</span>
+          </button>
+        </div>
+      </div>
+      <div class="lvjiang-modal__schedule-group">
+        <span class="lvjiang-modal__schedule-label">赛程视图：</span>
+        <div class="lvjiang-modal__schedule-chips">
+          <button type="button" class="lvjiang-modal__view-chip" data-view="list" title="赛程列表">
+            <svg class="lvjiang-modal__chip-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <span class="lvjiang-modal__view-text">列表</span>
+          </button>
+          <button type="button" class="lvjiang-modal__view-chip is-active" data-view="bracket" title="晋级对阵图">
+            <svg class="lvjiang-modal__chip-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="6" height="4" rx="1"></rect><rect x="3" y="16" width="6" height="4" rx="1"></rect><rect x="15" y="10" width="6" height="4" rx="1"></rect><path d="M9 6h3v12H9"></path><path d="M12 12h3"></path></svg>
+            <span class="lvjiang-modal__view-text">晋级图</span>
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="lvjiang-modal__team-bar" id="lvjiang-modal__team-bar">
       <span class="lvjiang-modal__team-bar-title">战队阵容：</span>
       <div class="lvjiang-modal__team-chips">
@@ -199,6 +281,28 @@ function createLvjiangModal() {
     });
   });
 
+  var stageChips = modal.querySelectorAll(".lvjiang-modal__stage-chip");
+  stageChips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var stage = chip.getAttribute("data-stage");
+      if (!stage) return;
+      currentScheduleStage = stage;
+      updateActiveScheduleChips(stage, null);
+      loadLvjiangContent("schedule", true);
+    });
+  });
+
+  var viewChips = modal.querySelectorAll(".lvjiang-modal__view-chip");
+  viewChips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var view = chip.getAttribute("data-view");
+      if (!view) return;
+      currentScheduleView = view;
+      updateActiveScheduleChips(null, view);
+      loadLvjiangContent("schedule", true);
+    });
+  });
+
   var chips = modal.querySelectorAll(".lvjiang-modal__team-chip");
   chips.forEach(function (chip) {
     chip.addEventListener("click", function () {
@@ -234,6 +338,16 @@ function switchLvjiangTab(key, teamId) {
     }
   });
 
+  var scheduleBar = modal.querySelector(".lvjiang-modal__schedule-bar");
+  if (scheduleBar) {
+    if (key === "schedule") {
+      scheduleBar.classList.add("is-visible");
+      updateActiveScheduleChips(currentScheduleStage, currentScheduleView);
+    } else {
+      scheduleBar.classList.remove("is-visible");
+    }
+  }
+
   var teamBar = modal.querySelector(".lvjiang-modal__team-bar");
   if (teamBar) {
     if (key === "teams") {
@@ -247,7 +361,9 @@ function switchLvjiangTab(key, teamId) {
   var extBtn = modal.querySelector(".lvjiang-modal__external-btn");
   if (extBtn && LVJIANG_PAGES[key]) {
     var pageUrl = LVJIANG_PAGES[key].url;
-    if (key === "teams") {
+    if (key === "schedule") {
+      pageUrl = getScheduleUrl(currentScheduleStage, currentScheduleView);
+    } else if (key === "teams") {
       pageUrl = "https://xinlvjiang.icu/teams/" + currentLvjiangTeamId + "/?event=lvjiangbeiS3&team=" + currentLvjiangTeamId + "&return_to=%2F%3Fevent%3DlvjiangbeiS3";
     }
     extBtn.href = pageUrl;
@@ -265,7 +381,9 @@ function loadLvjiangContent(key, forceReload, teamId) {
   if (!iframe || !LVJIANG_PAGES[key]) return;
 
   var targetUrl = LVJIANG_PAGES[key].url;
-  if (key === "teams") {
+  if (key === "schedule") {
+    targetUrl = getScheduleUrl(currentScheduleStage, currentScheduleView);
+  } else if (key === "teams") {
     var tid = teamId || currentLvjiangTeamId || "49";
     targetUrl = "https://xinlvjiang.icu/teams/" + tid + "/?event=lvjiangbeiS3&team=" + tid + "&return_to=%2F%3Fevent%3DlvjiangbeiS3";
   }

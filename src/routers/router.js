@@ -327,6 +327,21 @@ function initRouter_Xinlvjiang() {
             "    margin: 0 auto !important;",
             "    padding: 0 16px 40px !important;",
             "}",
+            "/* 赛程页（schedule）官方布局保真与视窗适配 */",
+            ".schedule-page .site-main {",
+            "    max-width: 1400px !important;",
+            "    margin: 0 auto !important;",
+            "    padding: 10px 16px 40px !important;",
+            "    background: transparent !important;",
+            "}",
+            ".schedule-stagebar {",
+            "    background: rgba(26, 28, 34, 0.9) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.08) !important;",
+            "    border-radius: 12px !important;",
+            "    padding: 8px 16px !important;",
+            "    margin-bottom: 16px !important;",
+            "    backdrop-filter: blur(12px) !important;",
+            "}",
             ".profile-return-row {",
             "    background: rgba(26, 28, 34, 0.95) !important;",
             "    border: 1px solid rgba(215, 184, 117, 0.35) !important;",
@@ -399,6 +414,17 @@ function initRouter_Xinlvjiang() {
                 previews[i].removeAttribute("data-profile-preview");
                 previews[i].removeAttribute("aria-haspopup");
             }
+            var links = document.querySelectorAll("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']");
+            for (var k = 0; k < links.length; k++) {
+                var lk = links[k];
+                lk.removeAttribute("data-profile-preview");
+                lk.removeAttribute("aria-haspopup");
+                lk.target = "_self";
+                var curHref = lk.getAttribute("href") || "";
+                if (curHref.indexOf("/previews/players/") !== -1) {
+                    lk.setAttribute("href", curHref.replace(/\/previews\/players\//, "/players/"));
+                }
+            }
             var dialogs = document.querySelectorAll("dialog.profile-preview-dialog, [data-profile-dialog]");
             for (var j = 0; j < dialogs.length; j++) {
                 if (typeof dialogs[j].close === "function" && dialogs[j].open) {
@@ -409,50 +435,106 @@ function initRouter_Xinlvjiang() {
         } catch (_) {}
     }
 
+    function syncScheduleStateToParent() {
+        if (!window.parent || window.parent === window) return;
+        try {
+            var href = window.location.href;
+            if (href.indexOf("/schedule") !== -1) {
+                var stage = "swiss";
+                var view = "bracket";
+                if (href.indexOf("stage=playoff") !== -1) stage = "playoff";
+                else if (href.indexOf("stage=swiss") !== -1) stage = "swiss";
+                if (href.indexOf("view=list") !== -1) view = "list";
+                else if (href.indexOf("view=bracket") !== -1) view = "bracket";
+
+                window.parent.postMessage({
+                    type: "lvjiang_schedule_sync",
+                    stage: stage,
+                    view: view
+                }, "*");
+            }
+            window.parent.postMessage({
+                type: "lvjiang_url_change",
+                url: href,
+                pathname: window.location.pathname
+            }, "*");
+        } catch (_) {}
+    }
+
     var interactionsBound = false;
     function bindInteractions() {
         stripPreviewAttributes();
+        syncScheduleStateToParent();
         if (interactionsBound) return;
         interactionsBound = true;
 
         function safeNavigate(url) {
             if (!url) return;
             url = String(url).replace(/&amp;/g, "&");
+            var absoluteUrl = url;
+            try {
+                absoluteUrl = new URL(url, window.location.origin).href;
+            } catch (_) {}
             try {
                 if (document.body) {
                     document.body.style.opacity = "0.75";
                     document.body.style.transition = "opacity 0.15s ease";
                 }
             } catch (_) {}
-            var realWin = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
+
+            // 1. 创建合成 <a> 标签并以 target="_self" 原生点击直达，穿透任何代理沙箱
             try {
-                realWin.location.href = url;
-            } catch (err1) {
-                try {
-                    window.location.href = url;
-                } catch (err2) {
-                    try {
-                        realWin.location.assign(url);
-                    } catch (err3) {
-                        window.location.assign(url);
-                    }
+                var a = document.createElement("a");
+                a.href = absoluteUrl;
+                a.target = "_self";
+                a.rel = "noopener noreferrer";
+                a.setAttribute("data-douyux-nav", "1");
+                a.style.display = "none";
+                (document.body || document.documentElement).appendChild(a);
+                a.click();
+                setTimeout(function () {
+                    try { a.remove(); } catch (_) {}
+                }, 300);
+            } catch (_) {}
+
+            // 2. 标准 window.location.href 赋值
+            try {
+                window.location.href = absoluteUrl;
+            } catch (_) {}
+
+            // 3. window.location.assign 兜底
+            try {
+                window.location.assign(absoluteUrl);
+            } catch (_) {}
+
+            // 4. unsafeWindow 兜底
+            try {
+                if (typeof unsafeWindow !== "undefined" && unsafeWindow && unsafeWindow.location) {
+                    unsafeWindow.location.href = absoluteUrl;
                 }
-            }
+            } catch (_) {}
         }
 
         function extractEntrantId(card) {
             if (!card) return "";
-            var id = card.getAttribute("data-entrant-card") || card.getAttribute("data-player-id") || card.getAttribute("data-player");
+            var id = card.getAttribute("data-entrant-card") ||
+                     card.getAttribute("data-player-id") ||
+                     card.getAttribute("data-player") ||
+                     card.getAttribute("data-id");
             if (id && /^\d+$/.test(id)) return id;
 
-            var link = card.querySelector("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']");
+            var link = card.tagName === "A" ? card : (
+                (card.closest ? card.closest("a[href*='/players/'], a[href*='/previews/players/']") : null) ||
+                card.querySelector("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']")
+            );
             var href = link ? (link.href || link.getAttribute("href") || "") : "";
-            var m = href.match(/\/players\/(\d+)/);
+            var m = href.match(/\/players\/(\d+)/) || href.match(/\/previews\/players\/(\d+)/);
             if (m && m[1]) return m[1];
 
-            var previewAttr = link ? link.getAttribute("data-profile-preview") : "";
+            var previewAttr = (card.getAttribute && card.getAttribute("data-profile-preview")) ||
+                              (link ? link.getAttribute("data-profile-preview") : "");
             if (previewAttr) {
-                var pm = previewAttr.match(/\/players\/(\d+)/);
+                var pm = previewAttr.match(/\/players\/(\d+)/) || previewAttr.match(/\/previews\/players\/(\d+)/);
                 if (pm && pm[1]) return pm[1];
             }
             return "";
@@ -460,12 +542,32 @@ function initRouter_Xinlvjiang() {
 
         function extractTargetUrl(card) {
             if (!card) return "";
-            // 优先直接获取卡片自带的选手资料链接（DOM属性 link.href 天然解码 HTML 实体）
-            var link = card.querySelector("a.player-card-link, a[href*='/players/']");
-            var href = link ? (link.href || link.getAttribute("href") || "") : "";
-            if (href && href.indexOf("/players/") !== -1) {
-                return href.replace(/&amp;/g, "&");
+
+            // 0. 若卡片本身即为 <a> 标签且指向选手
+            if (card.tagName === "A" && card.href) {
+                var href0 = card.href || card.getAttribute("href") || "";
+                if (href0 && (href0.indexOf("/players/") !== -1 || href0.indexOf("/previews/players/") !== -1)) {
+                    return href0.replace(/\/previews\/players\//, "/players/").replace(/&amp;/g, "&");
+                }
             }
+
+            // 1. 若卡片处于外部 <a> 链接内
+            var parentLink = card.closest ? card.closest("a[href*='/players/'], a.player-card-link") : null;
+            if (parentLink) {
+                var hrefP = parentLink.href || parentLink.getAttribute("href") || "";
+                if (hrefP && (hrefP.indexOf("/players/") !== -1 || hrefP.indexOf("/previews/players/") !== -1)) {
+                    return hrefP.replace(/\/previews\/players\//, "/players/").replace(/&amp;/g, "&");
+                }
+            }
+
+            // 2. 优先直接获取卡片内部的选手资料链接（DOM属性 link.href 天然解码 HTML 实体）
+            var link = card.querySelector("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']");
+            var href = link ? (link.href || link.getAttribute("href") || "") : "";
+            if (href && (href.indexOf("/players/") !== -1 || href.indexOf("/previews/players/") !== -1)) {
+                return href.replace(/\/previews\/players\//, "/players/").replace(/&amp;/g, "&");
+            }
+
+            // 3. 从 data 属性中解析 entrantId
             var entrantId = extractEntrantId(card);
             if (entrantId) {
                 var currentReturn = encodeURIComponent(window.location.pathname + window.location.search);
@@ -477,6 +579,11 @@ function initRouter_Xinlvjiang() {
         // 委托点击事件：拦截卡片与返回链接，平滑直达选手官方详情页
         function handleDelegateClick(e) {
             if (!e.target) return;
+
+            // 0. 我们自己触发的合成导航链接直接放行，执行原生跳转
+            if (e.target && e.target.getAttribute && e.target.getAttribute("data-douyux-nav")) {
+                return;
+            }
 
             // ① 直播间外链放行
             if (e.target.closest && e.target.closest(".card-room-entry, .profile-live-link")) {
@@ -498,9 +605,8 @@ function initRouter_Xinlvjiang() {
                 if (backTarget) {
                     safeNavigate(backTarget);
                 } else {
-                    var realWin = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
-                    if (realWin.history && realWin.history.length > 1) {
-                        realWin.history.back();
+                    if (window.history && window.history.length > 1) {
+                        window.history.back();
                     } else {
                         safeNavigate("/?event=lvjiangbeiS3");
                     }
@@ -508,8 +614,8 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ④ 处于选手卡片（.player-card）区域内的点击
-            var card = e.target.closest && e.target.closest(".player-card");
+            // ④ 处于选手卡片区域内的点击（覆盖各类类名与属性）
+            var card = e.target.closest && e.target.closest(".player-card, .catalog-player-card, [data-entrant-card], [data-player-id], a[href*='/players/'], a.player-card-link");
             if (!card) return;
 
             // 评级样式预览卡（S+, S, A... 纯卡面展示）放行，交由原站样式筛选
@@ -551,6 +657,7 @@ function initRouter_Xinlvjiang() {
     injectXinlvjiangStyles();
     bindInteractions();
     stripPreviewAttributes();
+    syncScheduleStateToParent();
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", function () {
@@ -558,6 +665,7 @@ function initRouter_Xinlvjiang() {
             injectXinlvjiangStyles();
             bindInteractions();
             stripPreviewAttributes();
+            syncScheduleStateToParent();
         });
     }
 
@@ -566,6 +674,7 @@ function initRouter_Xinlvjiang() {
         applyDarkTheme();
         injectXinlvjiangStyles();
         stripPreviewAttributes();
+        syncScheduleStateToParent();
         checkCount++;
         if (checkCount > 15) clearInterval(themeTimer);
     }, 300);
