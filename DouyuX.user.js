@@ -3,10 +3,8 @@
 // @namespace    https://github.com/liyesong111/DouyuX
 // @homepageURL  https://github.com/liyesong111/DouyuX
 // @supportURL   https://github.com/liyesong111/DouyuX/issues
-// @updateURL    https://github.com/liyesong111/DouyuX/raw/main/DouyuX.user.js
-// @downloadURL  https://github.com/liyesong111/DouyuX/raw/main/DouyuX.user.js
 // @icon         https://raw.githubusercontent.com/liyesong111/DouyuX/main/icon.png
-// @version      2026.11.01.15
+// @version      2026.11.01.16
 // @description  DouyuX 纯净版：斗鱼直播间纯净增强，支持最高画质秒开、同屏多路分屏播放、驴酱杯赛事数据与日常签到。
 // @author       liyesong
 // @match			*://*.douyu.com/0*
