@@ -108,7 +108,7 @@ function makeEnv(opts) {
         function () {},
         function (k) { delete store[k]; },
         conf.log || {},
-        conf.sections || ["同屏播放", "驴酱杯赛程", "弹幕发送"]
+        conf.sections || ["同屏播放", "赛程跳转", "弹幕发送"]
     );
     function flushTimers() {
         let guard = 0;
@@ -251,14 +251,14 @@ async function testLogRender() {
         log: {
             "features": {
                 "同屏播放": ["【画质自适应】支持最高画质秒开"],
-                "驴酱杯赛程": ["【赛事大屏】内置驴酱杯赛事大屏"],
+                "赛程跳转": ["【官网直达】驴酱杯赛程官网直达"],
                 "弹幕发送": ["【弹幕助手】支持弹幕定时轮换发送"]
             }
         }
     });
     const html2 = env2.api.buildCards();
     assert.ok(html2.indexOf("画质自适应") !== -1, "必须渲染固定功能说明条目");
-    assert.ok(html2.indexOf("赛事大屏") !== -1, "必须渲染固定功能说明条目");
+    assert.ok(html2.indexOf("官网直达") !== -1, "必须渲染固定功能说明条目");
     assert.ok(html2.indexOf("弹幕助手") !== -1, "必须渲染固定功能说明条目");
     env2.dom.window.close();
 

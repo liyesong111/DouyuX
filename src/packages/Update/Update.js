@@ -269,7 +269,7 @@ function getExUpdateLogFor(version) {
 function getExUpdateLogSections() {
   return (typeof EX_UPDATE_LOG_SECTIONS !== "undefined" && Array.isArray(EX_UPDATE_LOG_SECTIONS))
     ? EX_UPDATE_LOG_SECTIONS
-    : ["同屏播放", "驴酱杯赛程", "弹幕发送"];
+    : ["同屏播放", "赛程跳转", "弹幕发送"];
 }
 
 function escapeUpdateLogText(str) {
@@ -277,7 +277,7 @@ function escapeUpdateLogText(str) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// 依据数据源渲染三大核心功能卡片（同屏播放、驴酱杯赛程、弹幕发送）
+// 依据数据源渲染三大核心功能卡片（同屏播放、赛程跳转、弹幕发送）
 function buildExUpdateCardsHtml() {
   var entry = getExUpdateLogFor(curVersion);
   var sections = getExUpdateLogSections();
