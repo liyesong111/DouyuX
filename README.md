@@ -8,7 +8,7 @@
 
 ---
 
-> 💡 本项目基于 [DouyuEx-RL](https://github.com/liyesong111/DouyuEx-RL) 项目深度重构与定制改版而成，在此对原项目及维护者的开源贡献与工程实践表示诚挚感谢！
+> 💡 本项目基于 [https://github.com/xayahcore/DouyuEx-RL) 项目深度重构与定制改版而成，在此对原项目及维护者的开源贡献与工程实践表示诚挚感谢！
 
 ### 🚀 快速安装
 
