@@ -3261,6 +3261,14 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     color: #94A3B8 !important;
     font-size: 13px !important;
     z-index: 2 !important;
+    transition: opacity 0.2s ease, visibility 0.2s ease !important;
+}
+
+.lvjiang-modal__loading.is-hidden {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 
 .lvjiang-modal__spinner {
@@ -3420,15 +3428,6 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     background: #1E2026 !important;
     color: #FFFFFF !important;
     padding: 4px 8px !important;
-}
-
-.monitor-query-panel select optgroup,
-.monitor-query__anchor-select optgroup,
-.monitor-query__gift-anchor-select optgroup {
-    background: #18191E !important;
-    color: #FF6600 !important;
-    font-weight: 600 !important;
-    font-size: 11px !important;
 }
 
 .monitor-query__search-bar {

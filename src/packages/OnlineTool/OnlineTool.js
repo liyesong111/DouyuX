@@ -85,7 +85,7 @@ function createLvjiangModal() {
   modal.innerHTML = `
     <div class="lvjiang-modal__header">
       <div class="lvjiang-modal__title-wrap">
-        <span class="lvjiang-modal__title">驴酱杯 · S3</span>
+        <span class="lvjiang-modal__title">驴酱杯</span>
         <div class="lvjiang-modal__tabs">
           <button type="button" class="lvjiang-modal__tab is-active" data-key="schedule">赛程</button>
           <button type="button" class="lvjiang-modal__tab" data-key="teams">阵容</button>
@@ -173,7 +173,10 @@ function loadLvjiangContent(key) {
   if (!iframe || !LVJIANG_PAGES[key]) return;
 
   var targetUrl = LVJIANG_PAGES[key].url;
-  if (loading) loading.style.display = "flex";
+  if (loading) {
+    loading.classList.remove("is-hidden");
+    loading.style.setProperty("display", "flex", "important");
+  }
 
   var completed = false;
   var timer = null;
@@ -185,75 +188,26 @@ function loadLvjiangContent(key) {
       clearTimeout(timer);
       timer = null;
     }
-    if (loading) loading.style.display = "none";
+    if (loading) {
+      loading.classList.add("is-hidden");
+      loading.style.setProperty("display", "none", "important");
+    }
   }
 
-  // 安全兜底定时器：3 秒内若未完成，无论如何收起加载遮罩并强制直接走 iframe.src
-  timer = setTimeout(function () {
-    if (!completed) {
-      if (!iframe.src && !iframe.srcdoc) {
-        iframe.removeAttribute("srcdoc");
-        iframe.src = targetUrl;
-      }
-      finishLoading();
-    }
-  }, 3000);
+  // 安全兜底定时器：2.5 秒内无论如何收起加载遮罩，保证原站内容立即可见
+  timer = setTimeout(finishLoading, 2500);
 
   iframe.onload = function () {
     finishLoading();
   };
 
-  var gmXhr = (typeof GM_xmlhttpRequest === "function") ? GM_xmlhttpRequest :
-              ((typeof window !== "undefined" && typeof window.GM_xmlhttpRequest === "function") ? window.GM_xmlhttpRequest : null);
-
-  if (gmXhr) {
-    try {
-      gmXhr({
-        method: "GET",
-        url: targetUrl,
-        timeout: 4000,
-        onload: function (res) {
-          if (completed) return;
-          if (res && res.status >= 200 && res.status < 400 && res.responseText) {
-            var html = res.responseText;
-            var baseTag = '<base href="https://xinlvjiang.icu/">';
-            var customCss = '<style>body{background-color:#141518 !important;}.site-header,.site-scenery{display:none !important;}body{padding-top:8px !important;}</style>';
-            if (html.indexOf("<head>") !== -1) {
-              html = html.replace("<head>", "<head>" + baseTag + customCss);
-            } else if (html.indexOf("<html>") !== -1) {
-              html = html.replace("<html>", "<html><head>" + baseTag + customCss + "</head>");
-            } else {
-              html = baseTag + customCss + html;
-            }
-            iframe.removeAttribute("src");
-            iframe.srcdoc = html;
-            setTimeout(finishLoading, 200);
-          } else {
-            iframe.removeAttribute("srcdoc");
-            iframe.src = targetUrl;
-          }
-        },
-        onerror: function () {
-          if (completed) return;
-          iframe.removeAttribute("srcdoc");
-          iframe.src = targetUrl;
-          finishLoading();
-        },
-        ontimeout: function () {
-          if (completed) return;
-          iframe.removeAttribute("srcdoc");
-          iframe.src = targetUrl;
-          finishLoading();
-        }
-      });
-      return;
-    } catch (e) {
-      console.warn("[DouyuEx][驴酱杯] GM_xmlhttpRequest 请求失败，回退 iframe.src:", e);
-    }
+  // 直接设置 iframe.src 加载原站（xinlvjiang.icu 声明了 frame-ancestors *，可跨域安全内嵌且脚本运行正常）
+  if (iframe.src !== targetUrl) {
+    iframe.removeAttribute("srcdoc");
+    iframe.src = targetUrl;
+  } else {
+    finishLoading();
   }
-
-  iframe.removeAttribute("srcdoc");
-  iframe.src = targetUrl;
 }
 
 function openLvjiangModal(key) {
@@ -386,54 +340,13 @@ var MONITOR_ROOM_LIST = [
   { id: "9999", name: "超级小桀" }
 ];
 
-var LVJIANG_ROOM_IDS = [
-  "138243",   // 洞主丨歌神洞庭湖
-  "71091",    // 驴酱阿松
-  "1126960",  // 余小C真的很强
-  "317422",   // 驴酱的冯雨大王
-  "2561707",  // 网友张顺飞
-  "4452132",  // 何二抛zZ
-  "888388",   // 你的大湿兄zz
-  "796833",   // ShaunaVayne丨琦
-  "52",       // 火星包
-  "3863752"   // 小甜椒单排日记
-];
-
 function renderMonitorAnchorOptions(includeAll, isGift) {
-  var html = includeAll ? '<option value="">全部主播</option>' : '';
-
-  var lvMap = {};
-  LVJIANG_ROOM_IDS.forEach(function (id) { lvMap[id] = true; });
-
-  var lvRooms = [];
-  var otherRooms = [];
+  var allText = isGift ? "驴酱" : "全部主播";
+  var html = includeAll ? '<option value="">' + allText + '</option>' : '';
 
   for (var i = 0; i < MONITOR_ROOM_LIST.length; i++) {
     var r = MONITOR_ROOM_LIST[i];
-    if (lvMap[r.id]) {
-      lvRooms.push(r);
-    } else {
-      otherRooms.push(r);
-    }
-  }
-
-  html += '<optgroup label="驴酱主播">';
-  if (isGift) {
-    html += '<option value="lvjiang_all">★ 驴酱所有</option>';
-  }
-  for (var j = 0; j < lvRooms.length; j++) {
-    var lr = lvRooms[j];
-    html += '<option value="' + escapeMonitorHtml(lr.id) + '">' + escapeMonitorHtml(lr.name) + '</option>';
-  }
-  html += '</optgroup>';
-
-  if (otherRooms.length > 0) {
-    html += '<optgroup label="监控室其他主播">';
-    for (var k = 0; k < otherRooms.length; k++) {
-      var or = otherRooms[k];
-      html += '<option value="' + escapeMonitorHtml(or.id) + '">' + escapeMonitorHtml(or.name) + '</option>';
-    }
-    html += '</optgroup>';
+    html += '<option value="' + escapeMonitorHtml(r.id) + '">' + escapeMonitorHtml(r.name) + '</option>';
   }
 
   return html;
@@ -645,7 +558,7 @@ function bindMonitorQueryEvents(panel) {
     }
     var giftAnchorSelect = panel.querySelector(".monitor-query__gift-anchor-select");
     var giftTimeSelect = panel.querySelector(".monitor-query__gift-time-select");
-    var selectedAnchor = giftAnchorSelect ? giftAnchorSelect.value.trim() : "";
+    var roomId = giftAnchorSelect ? giftAnchorSelect.value.trim() : "";
     var timeKind = giftTimeSelect ? giftTimeSelect.value.trim() : "today";
 
     updateGiftRangeLabel();
@@ -655,21 +568,10 @@ function bindMonitorQueryEvents(panel) {
       chartContainer.innerHTML = '<div class="monitor-query__loading">数据加载中...</div>';
     }
 
-    var isLvjiangAll = (selectedAnchor === "lvjiang_all");
-    var queryRoomId = isLvjiangAll ? "" : selectedAnchor;
-
-    fetchMonitorGiftStats(queryRoomId, timeKind).then(function (res) {
+    fetchMonitorGiftStats(roomId, timeKind).then(function (res) {
       giftLoaded = true;
-      var rawItems = res && (res.items || res.gifts || res.list || res);
-      if (isLvjiangAll && Array.isArray(rawItems)) {
-        var lvMap = {};
-        LVJIANG_ROOM_IDS.forEach(function (id) { lvMap[id] = true; });
-        rawItems = rawItems.filter(function (it) {
-          return it && it.room_id && lvMap[String(it.room_id)];
-        });
-      }
       if (typeof renderMonitorGiftChart === "function") {
-        renderMonitorGiftChart(rawItems);
+        renderMonitorGiftChart(res && (res.items || res.gifts || res.list || res));
       }
     }).catch(function (err) {
       console.warn("[DouyuEx][监控室] 礼物统计查询失败:", err);
