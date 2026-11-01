@@ -8,6 +8,9 @@ function initPkg_VideoTools_VideoToolbarMenu() {
 }
 
 function VideoToolbarMenu_insertDom() {
+    if (typeof PokeballIcon_svg !== "undefined") {
+        VideoToolbarMenu_pokeballSvg = PokeballIcon_svg;
+    }
     const root = document.createElement("div");
     root.id = "ex-vtoolbar-menu";
     root.className = "vtoolbar-menu";

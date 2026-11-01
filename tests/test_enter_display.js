@@ -13,8 +13,8 @@ const ROOT = path.join(__dirname, "..");
 const REMOVE_AD_SRC = fs.readFileSync(path.join(ROOT, "src/packages/RemoveAD/RemoveAD.js"), "utf8");
 const REMOVE_ENTER_SRC = fs.readFileSync(path.join(ROOT, "src/packages/Shield/RemoveEnter.js"), "utf8");
 const SHIELD_SRC = fs.readFileSync(path.join(ROOT, "src/packages/Shield/Shield.js"), "utf8");
-const EXPAND_SRC = fs.readFileSync(path.join(ROOT, "src/packages/ExpandTool/ExpandTool.js"), "utf8");
-const EXPAND_SHIELD_SRC = fs.readFileSync(path.join(ROOT, "src/packages/ExpandTool/ExpandTool_Shield.js"), "utf8");
+const EXPAND_SRC = fs.readFileSync(path.join(ROOT, "src/packages/XpandTool/XpandTool.js"), "utf8");
+const EXPAND_SHIELD_SRC = fs.readFileSync(path.join(ROOT, "src/packages/XpandTool/XpandTool_Shield.js"), "utf8");
 
 /**
  * 进场弹幕屏蔽回归。

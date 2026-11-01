@@ -29,7 +29,7 @@ function readSrc(rel) {
     return text;
 }
 
-const EXGUARD_SRC = readSrc("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = readSrc("src/require/XGuard/XGuard.js");
 const SIGN_SRC = readSrc("src/packages/Sign/Sign.js");
 const FANS_SRC = readSrc("src/packages/Sign/Sign_FansTree.js");
 const STAR_SRC = readSrc("src/packages/Sign/Sign_StarDiscover.js");

@@ -6,7 +6,7 @@
  *
  * 2026-10-27 用户定案：这个二级菜单图标**不恢复**（不要把它加回胶囊条）。
  * "打开在线弹幕助手"的能力没有丢，已搬到「扩展功能」面板最后一张卡片：
- *   src/packages/ExpandTool/ExpandTool.js → initPkg_ExpandTool_MonitorLink()
+ *   src/packages/XpandTool/XpandTool.js → initPkg_ExpandTool_MonitorLink()
  *   按钮 id：extool__monitor_open（点击仍是 openPage("https://www.douyuex.com/" + rid)）
  * 也就是说：需要这个跳转的用户主动去面板里点，而不是让它常驻在胶囊条上。
  *

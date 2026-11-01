@@ -13,7 +13,7 @@ const ROOT = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 const COMMON_SRC = read("src/common.js");
-const EXGUARD_SRC = read("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = read("src/require/XGuard/XGuard.js");
 const MENU_SRC = read("src/packages/Menu/Menu.js");
 const NOLOGIN_SRC = read("src/packages/NoLogin/NoLogin.js");
 const DANMAKUTAIL_SRC = read("src/packages/DanmakuTail/DanmakuTail.js");
@@ -910,10 +910,10 @@ function testDanmakuTailEnterGuard() {
 /* 场景 14: 自动钓鱼四个包装器必须 settle（P0-4）                      */
 /* ------------------------------------------------------------------ */
 
-const AUTOFISH_SRC = read("src/packages/ExpandTool/ExpandTool_AutoFish.js");
-const SENDGIFT_SRC = read("src/packages/ExpandTool/ExpandTool_SendGift.js");
-const REDPACKET_SRC = read("src/packages/ExpandTool/ExpandTool_RedPacket_Room.js");
-const TREASURE_SRC = read("src/packages/ExpandTool/ExpandTool_Treasure.js");
+const AUTOFISH_SRC = read("src/packages/XpandTool/XpandTool_AutoFish.js");
+const SENDGIFT_SRC = read("src/packages/XpandTool/XpandTool_SendGift.js");
+const REDPACKET_SRC = read("src/packages/XpandTool/XpandTool_RedPacket_Room.js");
+const TREASURE_SRC = read("src/packages/XpandTool/XpandTool_Treasure.js");
 
 function loadAutoFish(opts) {
     const options = opts || {};
@@ -1417,7 +1417,7 @@ async function testFollowListNoDuplicate() {
 /* 场景 21: ExpandTool 初始化链逐项隔离（P2-1）                        */
 /* ------------------------------------------------------------------ */
 
-const EXPANDTOOL_SRC = read("src/packages/ExpandTool/ExpandTool.js");
+const EXPANDTOOL_SRC = read("src/packages/XpandTool/XpandTool.js");
 
 function loadExpandToolInit() {
     const start = EXPANDTOOL_SRC.indexOf("function initPkg_ExpandTool() {");

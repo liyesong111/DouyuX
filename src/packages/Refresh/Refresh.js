@@ -47,7 +47,7 @@ function Refresh_readSave() {
 
 /**
  * 读取「网页全屏」开关 —— 跨包**只读**的存储键。
- *   写入方：src/packages/ExpandTool/ExpandTool_FullScreen.js（ExSave_FullScreen.isFullScreen）
+ *   写入方：src/packages/XpandTool/XpandTool_FullScreen.js（ExSave_FullScreen.isFullScreen）
  *   用途：只决定播放器工具条的 z-index；读不到 / 坏值一律按"没全屏"处理。
  * ⚠ 改键名时两处必须同步（Refresh 不负责写这个键）。
  */

@@ -12,7 +12,7 @@ try {
 const ROOT = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
-const EXGUARD_SRC = read("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = read("src/require/XGuard/XGuard.js");
 const DOMHOOK_SRC = read("src/require/DomHook/DomHook.js");
 const LEVELTASK_SRC = read("src/packages/LevelTask/LevelTask.js");
 const IMAGE_SRC = read("src/packages/ImageDanmaku/ImageDanmaku.js");

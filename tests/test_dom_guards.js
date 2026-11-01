@@ -31,7 +31,7 @@ function readSrc(rel) {
     return text;
 }
 
-const EXGUARD_SRC = readSrc("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = readSrc("src/require/XGuard/XGuard.js");
 const LIVETOOL_SRC = readSrc("src/packages/LiveTool/LiveTool.js");
 const LOOP_SRC = readSrc("src/packages/BarrageLoop/BarrageLoop.js");
 const COMMON_SRC = readSrc("src/common.js");

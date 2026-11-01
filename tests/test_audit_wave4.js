@@ -21,7 +21,7 @@ function readSrc(rel) {
     assert.ok(text.length > 0, "源码读取为空: " + rel);
     return text;
 }
-const EXGUARD_SRC = readSrc("src/require/ExGuard/ExGuard.js");
+const EXGUARD_SRC = readSrc("src/require/XGuard/XGuard.js");
 
 function makeSandbox(sources, extraNames, extraValues, exposeExpr, overrides) {
     const opts = overrides || {};
