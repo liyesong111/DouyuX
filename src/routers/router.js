@@ -86,7 +86,7 @@ function initRouter_DouyuRoom_Main() {
         }
         if (!ready) {
             console.warn(
-                "[DouyuEx] 未等到预期页面元素（弹幕区: " + !!dom2 +
+                "[DouyuX] 未等到预期页面元素（弹幕区: " + !!dom2 +
                 "，背包入口: " + (!!dom1 || !!dom3) +
                 "），已等待 " + waited + " 秒，仍继续初始化"
             );
@@ -208,6 +208,7 @@ function initRouter_Xinlvjiang() {
                 document.body.setAttribute("data-theme", "dark");
                 document.body.dataset.theme = "dark";
                 document.body.dataset.palette = "crimson";
+                document.body.style.colorScheme = "dark";
             }
         } catch (_) {}
     }
@@ -218,9 +219,10 @@ function initRouter_Xinlvjiang() {
         var style = document.createElement("style");
         style.id = "douyux-xinlvjiang-style";
         style.textContent = [
-            "html, body, .teams-page, .players-page, .site-main, .team-workspace, .lineup-five, .catalog-results {",
+            ":root, html, body, .teams-page, .players-page, .site-main, .team-workspace, .lineup-five, .catalog-results {",
             "    background: #141518 !important;",
             "    color: #E2E8F0 !important;",
+            "    color-scheme: dark !important;",
             "    scrollbar-width: thin !important;",
             "    scrollbar-color: rgba(255, 102, 0, 0.4) transparent !important;",
             "}",
@@ -306,7 +308,7 @@ function initRouter_Xinlvjiang() {
             "    padding-top: 16px !important;",
             "    background: transparent !important;",
             "}",
-            "/* 选手卡片交互与质感：悬停发光、手型指针与微浮起 */",
+            "/* 选手卡片交互：悬停微浮发光、手型指针 */",
             ".player-card,",
             ".player-card *,",
             ".player-card-link,",
@@ -321,27 +323,172 @@ function initRouter_Xinlvjiang() {
             "    box-shadow: 0 10px 28px rgba(215, 184, 117, 0.35) !important;",
             "    z-index: 5 !important;",
             "}",
-            "/* 彻底屏蔽快览弹窗与原生 dialog 白色背景闪烁，确保卡片直达详细资料 */",
+            "/* 彻底屏蔽原生 dialog 的默认白底与白色闪烁 */",
+            "dialog,",
             "dialog.profile-preview-dialog,",
-            ".profile-preview-dialog,",
-            "[data-profile-dialog],",
-            ".lvjiang-custom-backdrop {",
-            "    display: none !important;",
-            "    opacity: 0 !important;",
-            "    visibility: hidden !important;",
-            "    pointer-events: none !important;",
-            "    width: 0 !important;",
-            "    height: 0 !important;",
-            "    border: none !important;",
-            "    background: transparent !important;",
+            "[data-profile-dialog] {",
+            "    background: #14161B !important;",
+            "    color: #E2E8F0 !important;",
+            "    color-scheme: dark !important;",
+            "    border: 1px solid rgba(215, 184, 117, 0.4) !important;",
+            "    border-radius: 16px !important;",
+            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.95) !important;",
             "}",
             "dialog::backdrop,",
             "dialog.profile-preview-dialog::backdrop,",
-            ".profile-preview-dialog::backdrop,",
             "[data-profile-dialog]::backdrop {",
-            "    display: none !important;",
-            "    opacity: 0 !important;",
-            "    background: transparent !important;",
+            "    background: rgba(0, 0, 0, 0.82) !important;",
+            "    backdrop-filter: blur(8px) !important;",
+            "    -webkit-backdrop-filter: blur(8px) !important;",
+            "}",
+            "/* DouyuX 专属暗黑金边全量详细资料浮层（彻底杜绝 iframe 白屏刷新闪烁） */",
+            ".douyux-dossier-overlay {",
+            "    position: fixed !important;",
+            "    inset: 0 !important;",
+            "    z-index: 2147483640 !important;",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    justify-content: center !important;",
+            "    padding: 16px !important;",
+            "    box-sizing: border-box !important;",
+            "    opacity: 0;",
+            "    pointer-events: none;",
+            "    transition: opacity 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-overlay.is-active {",
+            "    opacity: 1 !important;",
+            "    pointer-events: auto !important;",
+            "}",
+            ".douyux-dossier-backdrop {",
+            "    position: absolute !important;",
+            "    inset: 0 !important;",
+            "    background: rgba(8, 10, 14, 0.86) !important;",
+            "    backdrop-filter: blur(10px) !important;",
+            "    -webkit-backdrop-filter: blur(10px) !important;",
+            "}",
+            ".douyux-dossier-dialog {",
+            "    position: relative !important;",
+            "    width: min(1080px, 100%) !important;",
+            "    max-height: calc(100vh - 36px) !important;",
+            "    background: rgba(20, 22, 27, 0.98) !important;",
+            "    border: 1px solid rgba(215, 184, 117, 0.45) !important;",
+            "    border-radius: 16px !important;",
+            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.95), 0 0 40px rgba(215, 184, 117, 0.12) !important;",
+            "    overflow-y: auto !important;",
+            "    color: #E2E8F0 !important;",
+            "    color-scheme: dark !important;",
+            "    display: flex !important;",
+            "    flex-direction: column !important;",
+            "    transform: scale(0.96);",
+            "    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;",
+            "}",
+            ".douyux-dossier-overlay.is-active .douyux-dossier-dialog {",
+            "    transform: scale(1) !important;",
+            "}",
+            ".douyux-dossier-toolbar {",
+            "    background: rgba(26, 28, 34, 0.98) !important;",
+            "    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;",
+            "    position: sticky !important;",
+            "    top: 0 !important;",
+            "    z-index: 10 !important;",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    justify-content: space-between !important;",
+            "    padding: 12px 20px !important;",
+            "    gap: 12px !important;",
+            "}",
+            ".douyux-dossier-toolbar-left {",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    gap: 12px !important;",
+            "}",
+            ".douyux-dossier-back-btn {",
+            "    background: rgba(255, 136, 0, 0.15) !important;",
+            "    border: 1px solid rgba(255, 136, 0, 0.45) !important;",
+            "    color: #FF8800 !important;",
+            "    border-radius: 8px !important;",
+            "    padding: 6px 14px !important;",
+            "    font-size: 13px !important;",
+            "    font-weight: 700 !important;",
+            "    cursor: pointer !important;",
+            "    display: inline-flex !important;",
+            "    align-items: center !important;",
+            "    gap: 4px !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-back-btn:hover {",
+            "    background: rgba(255, 136, 0, 0.28) !important;",
+            "    color: #FFAA33 !important;",
+            "    transform: translateX(-2px) !important;",
+            "}",
+            ".douyux-dossier-title {",
+            "    color: #F8FAFC !important;",
+            "    font-weight: 700 !important;",
+            "    font-size: 15px !important;",
+            "}",
+            ".douyux-dossier-actions {",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    gap: 10px !important;",
+            "}",
+            ".douyux-dossier-ext-link {",
+            "    color: #94A3B8 !important;",
+            "    font-size: 12px !important;",
+            "    text-decoration: none !important;",
+            "    display: inline-flex !important;",
+            "    align-items: center !important;",
+            "    gap: 4px !important;",
+            "    padding: 6px 12px !important;",
+            "    border-radius: 6px !important;",
+            "    background: rgba(255, 255, 255, 0.05) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.1) !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-ext-link:hover {",
+            "    color: #FF8800 !important;",
+            "    border-color: rgba(255, 136, 0, 0.4) !important;",
+            "    background: rgba(255, 136, 0, 0.1) !important;",
+            "}",
+            ".douyux-dossier-close-btn {",
+            "    background: rgba(255, 255, 255, 0.08) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.15) !important;",
+            "    color: #CBD5E1 !important;",
+            "    border-radius: 50% !important;",
+            "    width: 32px !important;",
+            "    height: 32px !important;",
+            "    display: grid !important;",
+            "    place-items: center !important;",
+            "    font-size: 18px !important;",
+            "    cursor: pointer !important;",
+            "    line-height: 1 !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-close-btn:hover {",
+            "    background: rgba(239, 68, 68, 0.2) !important;",
+            "    border-color: rgba(239, 68, 68, 0.5) !important;",
+            "    color: #EF4444 !important;",
+            "}",
+            ".douyux-dossier-body {",
+            "    padding: 20px !important;",
+            "    min-height: 240px !important;",
+            "}",
+            ".douyux-dossier-loading {",
+            "    display: flex !important;",
+            "    flex-direction: column !important;",
+            "    align-items: center !important;",
+            "    justify-content: center !important;",
+            "    gap: 14px !important;",
+            "    padding: 70px 0 !important;",
+            "    color: #D7B875 !important;",
+            "    font-size: 14px !important;",
+            "}",
+            ".douyux-dossier-spinner {",
+            "    width: 38px !important;",
+            "    height: 38px !important;",
+            "    border: 3px solid rgba(215, 184, 117, 0.2) !important;",
+            "    border-top-color: #D7B875 !important;",
+            "    border-radius: 50% !important;",
+            "    animation: ex-spin 0.8s linear infinite !important;",
             "}",
             "/* 选手详情页返回条 */",
             ".profile-return-row {",
@@ -383,92 +530,157 @@ function initRouter_Xinlvjiang() {
     }
 
     function bindInteractions() {
-        // 1. 彻底禁用原生 dialog 弹出，从根源掐死白色底色闪烁
-        function suppressNativeDialog() {
+        var overlay = null;
+        var dossierCache = new Map();
+
+        function ensureDossierModal() {
+            if (overlay && overlay.isConnected) return overlay;
+            overlay = document.createElement("div");
+            overlay.className = "douyux-dossier-overlay";
+            overlay.innerHTML = [
+                '<div class="douyux-dossier-backdrop"></div>',
+                '<div class="douyux-dossier-dialog" role="dialog" aria-modal="true" aria-label="选手详细资料">',
+                '  <header class="douyux-dossier-toolbar">',
+                '    <div class="douyux-dossier-toolbar-left">',
+                '      <button type="button" class="douyux-dossier-back-btn">← 返回</button>',
+                '      <span class="douyux-dossier-title">选手详细资料</span>',
+                '    </div>',
+                '    <div class="douyux-dossier-actions">',
+                '      <a class="douyux-dossier-ext-link" href="#" target="_blank" rel="noopener noreferrer" title="在官网新标签页中打开完整资料">在新标签页打开 ↗</a>',
+                '      <button type="button" class="douyux-dossier-close-btn" aria-label="关闭详细资料">×</button>',
+                '    </div>',
+                '  </header>',
+                '  <div class="douyux-dossier-body"></div>',
+                '</div>'
+            ].join("");
+
+            (document.body || document.documentElement).appendChild(overlay);
+
+            var closeBtn = overlay.querySelector(".douyux-dossier-close-btn");
+            var backBtn = overlay.querySelector(".douyux-dossier-back-btn");
+            var backdrop = overlay.querySelector(".douyux-dossier-backdrop");
+
+            function close() {
+                if (overlay) overlay.classList.remove("is-active");
+            }
+
+            if (closeBtn) closeBtn.addEventListener("click", close);
+            if (backBtn) backBtn.addEventListener("click", close);
+            if (backdrop) backdrop.addEventListener("click", close);
+
+            document.addEventListener("keydown", function (e) {
+                if ((e.key === "Escape" || e.keyCode === 27) && overlay && overlay.classList.contains("is-active")) {
+                    close();
+                }
+            });
+
+            return overlay;
+        }
+
+        function renderDossierHtml(container, html) {
+            container.innerHTML = html;
             try {
-                var dialogs = document.querySelectorAll("dialog, [data-profile-dialog]");
-                for (var i = 0; i < dialogs.length; i++) {
-                    var d = dialogs[i];
-                    if (d.open) {
-                        try { d.close(); } catch (_) {}
-                    }
-                    d.showModal = function () {};
-                    d.show = function () {};
+                if (globalThis.LvjiangPlayerProfiles && typeof globalThis.LvjiangPlayerProfiles.mount === "function") {
+                    globalThis.LvjiangPlayerProfiles.mount(container);
+                } else if (typeof mountDossier === "function") {
+                    mountDossier(container);
                 }
             } catch (_) {}
-        }
-        suppressNativeDialog();
-
-        // 2. 统一可靠的 iframe 内部导航执行器。
-        //    这里绝不能同时模拟 <a>.click() 与 location.assign()：前者会让原站
-        //    的快览逻辑重新收到一次 click，两个导航也会竞争，表现为白闪或停在列表。
-        function safeNavigate(destUrl) {
-            if (!destUrl) return;
-            var fullUrl = destUrl;
-            try {
-                fullUrl = new URL(destUrl, window.location.href).href;
-            } catch (_) {
-                fullUrl = destUrl;
-            }
-            // 只保留一次真实导航，确保详情页在当前 iframe 内打开。
-            try {
-                window.location.assign(fullUrl);
-            } catch (_) {
+            setTimeout(function () {
                 try {
-                    window.location.href = fullUrl;
-                } catch (_) {
-                    try {
-                        location.href = fullUrl;
-                    } catch (_) {}
-                }
-            }
-        }
-
-        function getPlayerDetailUrl(card) {
-            if (!card) return "";
-            var link = card.querySelector("a.player-card-link, a[href*='/players/']");
-            var href = link && (link.getAttribute("href") || link.href);
-            if (href && !/^\s*(?:#|javascript:)/i.test(href)) {
-                try {
-                    var parsed = new URL(href, window.location.href);
-                    if (/^\/players\/\d+\/?$/.test(parsed.pathname)) {
-                        var returnPath = window.location.pathname + window.location.search;
-                        var returnParams = new URLSearchParams(window.location.search);
-                        returnParams.delete("_t");
-                        returnPath = window.location.pathname + (returnParams.toString() ? "?" + returnParams.toString() : "");
-                        parsed.searchParams.set("event", "lvjiangbeiS3");
-                        parsed.searchParams.set("return_to", returnPath);
-                        return parsed.href;
+                    if (globalThis.LvjiangPlayerProfiles && typeof globalThis.LvjiangPlayerProfiles.mount === "function") {
+                        globalThis.LvjiangPlayerProfiles.mount(container);
                     }
                 } catch (_) {}
-            }
-
-            var entrantId = card.getAttribute("data-entrant-card") ||
-                card.getAttribute("data-player-id") || card.getAttribute("data-player");
-            if (!entrantId || !/^\d+$/.test(entrantId)) return "";
-
-            var params = new URLSearchParams(window.location.search);
-            params.delete("_t");
-            var returnTo = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
-            return window.location.origin + "/players/" + entrantId + "/?event=lvjiangbeiS3&return_to=" + encodeURIComponent(returnTo);
+            }, 100);
         }
 
-        // 3. 剥离卡片上原站绑定的 data-profile-preview 与 aria-haspopup 属性，防止原站脚本劫持
-        function sanitizeCards(root) {
-            var scope = root || document;
-            var elements = scope.querySelectorAll(".player-card, a.player-card-link, [data-profile-preview], [data-entrant-card]");
-            for (var i = 0; i < elements.length; i++) {
-                var el = elements[i];
-                el.removeAttribute("data-profile-preview");
-                el.removeAttribute("aria-haspopup");
-                if (el.tagName === "A") {
-                    el.target = "_self";
+        function openPlayerDossier(entrantId, playerName) {
+            if (!entrantId) return;
+            var modal = ensureDossierModal();
+            var titleEl = modal.querySelector(".douyux-dossier-title");
+            var extLink = modal.querySelector(".douyux-dossier-ext-link");
+            var bodyEl = modal.querySelector(".douyux-dossier-body");
+
+            var nameStr = (playerName || "").trim();
+            if (titleEl) {
+                titleEl.textContent = nameStr ? (nameStr + " · 选手详细资料") : "选手详细资料";
+            }
+            if (extLink) {
+                extLink.href = "https://xinlvjiang.icu/players/" + entrantId + "/?event=lvjiangbeiS3";
+            }
+
+            modal.classList.add("is-active");
+
+            if (dossierCache.has(entrantId)) {
+                renderDossierHtml(bodyEl, dossierCache.get(entrantId));
+                return;
+            }
+
+            bodyEl.innerHTML = [
+                '<div class="douyux-dossier-loading">',
+                '  <div class="douyux-dossier-spinner"></div>',
+                '  <span>正在回源同步【' + (nameStr || '选手') + '】官网全量详细数据...</span>',
+                '</div>'
+            ].join("");
+
+            var endpoint = "/previews/players/" + entrantId + "/?event=lvjiangbeiS3";
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", endpoint, true);
+            xhr.setRequestHeader("Accept", "text/html");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status >= 200 && xhr.status < 400 && xhr.responseText) {
+                        dossierCache.set(entrantId, xhr.responseText);
+                        renderDossierHtml(bodyEl, xhr.responseText);
+                    } else {
+                        bodyEl.innerHTML = [
+                            '<div style="text-align:center;padding:50px 20px;color:#CBD5E1;">',
+                            '  <p style="font-size:15px;margin-bottom:16px;">获取详细资料失败，您可以直接在官网打开完整页面查看：</p>',
+                            '  <a class="button primary" href="https://xinlvjiang.icu/players/' + entrantId + '/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" style="color:#FF8800;font-weight:700;">直达选手官方资料页 ↗</a>',
+                            '</div>'
+                        ].join("");
+                    }
                 }
-            }
+            };
+            xhr.onerror = function () {
+                bodyEl.innerHTML = [
+                    '<div style="text-align:center;padding:50px 20px;color:#CBD5E1;">',
+                    '  <p style="font-size:15px;margin-bottom:16px;">网络异常，您可以直接在官网打开完整页面查看：</p>',
+                    '  <a class="button primary" href="https://xinlvjiang.icu/players/' + entrantId + '/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" style="color:#FF8800;font-weight:700;">直达选手官方资料页 ↗</a>',
+                    '</div>'
+                ].join("");
+            };
+            xhr.send();
         }
-        sanitizeCards();
 
-        // 4. 选手详情独立页面自动插入顶部“返回”导航条
+        function extractEntrantId(card) {
+            if (!card) return "";
+            var id = card.getAttribute("data-entrant-card") || card.getAttribute("data-player-id") || card.getAttribute("data-player");
+            if (id && /^\d+$/.test(id)) return id;
+
+            var link = card.querySelector("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']");
+            var href = link ? (link.getAttribute("href") || link.href || "") : "";
+            var m = href.match(/\/players\/(\d+)/);
+            if (m && m[1]) return m[1];
+
+            var previewAttr = link ? link.getAttribute("data-profile-preview") : "";
+            if (previewAttr) {
+                var pm = previewAttr.match(/\/players\/(\d+)/);
+                if (pm && pm[1]) return pm[1];
+            }
+            return "";
+        }
+
+        function extractPlayerName(card) {
+            if (!card) return "";
+            var nameEl = card.querySelector(".player-name-line h3, h3, .player-name, [title]");
+            if (nameEl) {
+                return nameEl.getAttribute("title") || nameEl.textContent || "";
+            }
+            return "";
+        }
+
         function ensureReturnBar() {
             if (document.querySelector(".profile-return-row")) return;
             var container = document.querySelector("#main, .player-dossier, .site-main");
@@ -493,37 +705,11 @@ function initRouter_Xinlvjiang() {
             ensureReturnBar();
         }
 
-        // 5. 持续监听 DOM 变化：动态卡片挂载即刻消毒、dialog 即刻压制
-        if (typeof MutationObserver !== "undefined") {
-            try {
-                var observer = new MutationObserver(function (mutations) {
-                    suppressNativeDialog();
-                    for (var m = 0; m < mutations.length; m++) {
-                        var mutation = mutations[m];
-                        if (mutation.addedNodes && mutation.addedNodes.length > 0) {
-                            for (var n = 0; n < mutation.addedNodes.length; n++) {
-                                var node = mutation.addedNodes[n];
-                                if (node.nodeType === 1) {
-                                    sanitizeCards(node);
-                                    if (window.location.pathname.indexOf("/players/") !== -1 || node.querySelector && node.querySelector(".player-dossier")) {
-                                        ensureReturnBar();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-                observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
-            } catch (_) {}
-        }
-
-        // 6. 必须挂在 window 捕获阶段：原站在 document 捕获阶段先开快览 dialog。
-        //    在 document 上拦截已经太晚，白色快览层会先闪一帧。
         window.addEventListener("click", function (e) {
             if (!e.target) return;
 
-            // ① 直播间跳转按钮（.card-room-entry）放行，供用户在新标签页打开主播房间
-            if (e.target.closest && e.target.closest(".card-room-entry")) {
+            // ① 直播间跳转按钮放行，供用户在新标签页打开主播房间
+            if (e.target.closest && e.target.closest(".card-room-entry, .profile-live-link")) {
                 return;
             }
 
@@ -532,22 +718,7 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ③ 选手详情页中的返回链接（← 返回阵容 / ← 返回选手）平滑回退
-            var backBtn = e.target.closest && e.target.closest(".back-link, .profile-return-row a");
-            if (backBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-                var backTarget = backBtn.getAttribute("href") || backBtn.href;
-                if (backTarget) {
-                    safeNavigate(backTarget);
-                } else if (window.history && window.history.length > 1) {
-                    window.history.back();
-                }
-                return;
-            }
-
-            // ④ 处于选手卡片（.player-card）区域内的点击
+            // ③ 处于选手卡片（.player-card）区域内的点击
             var card = e.target.closest && e.target.closest(".player-card");
             if (!card) return;
 
@@ -556,34 +727,20 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // 当前已在选手独立资料页（.player-dossier）内时，左侧卡片无需重复跳转自身
-            if (document.querySelector(".player-dossier") && card.closest(".dossier-identity")) {
+            // 当前已在选手独立资料页（.player-dossier）内时，左侧卡片无需重复弹出自身
+            if (document.querySelector(".player-dossier") && card.closest(".dossier-identity") && !card.closest(".douyux-dossier-dialog")) {
                 return;
             }
 
-            // 提取目标选手详细信息 URL
-            var destUrl = getPlayerDetailUrl(card);
-
-            if (destUrl) {
-                // 阻断原站对点击的错误弹窗劫持，通过安全导航器直接直达选手详细资料页
+            var entrantId = extractEntrantId(card);
+            if (entrantId) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof e.stopImmediatePropagation === "function") {
                     e.stopImmediatePropagation();
                 }
-                safeNavigate(destUrl);
-            }
-        }, true);
-
-        // 双击兜底保障：双击卡片同样直接直达选手详细资料页
-        window.addEventListener("dblclick", function (e) {
-            var card = e.target.closest && e.target.closest(".player-card");
-            if (card && (!card.classList || !card.classList.contains("catalog-style-card"))) {
-                var destUrl = getPlayerDetailUrl(card);
-                if (destUrl) {
-                    e.preventDefault();
-                    safeNavigate(destUrl);
-                }
+                var pName = extractPlayerName(card);
+                openPlayerDossier(entrantId, pName);
             }
         }, true);
     }
@@ -599,7 +756,6 @@ function initRouter_Xinlvjiang() {
         bindInteractions();
     }
 
-    // 防御性定期确保暗色模式与弹窗解除
     var checkCount = 0;
     var themeTimer = setInterval(function () {
         applyDarkTheme();

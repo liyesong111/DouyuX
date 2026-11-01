@@ -11,7 +11,7 @@ const SRC = fs.readFileSync(path.join(ROOT, "src/packages/FansContinue/FansConti
  * 一键续牌「打开即读数据」回归（2026-10-30 用户回归报障）：
  *   面板可能由「图标点击」之外的路打开（二级菜单悬停 / 快捷键），旧实现只在点击那条路
  *   调 updateFansContinuePanel → 悬停打开时徽章与资产一直停在占位符。
- *   现状：建面板时先读一次；另监听 DouyuEx:thirdLevelOpened 事件补刷新。
+ *   现状：建面板时先读一次；另监听 DouyuX:thirdLevelOpened 事件补刷新。
  */
 const SAMPLE_HTML = `<html><body><table class="aui_room_table fans-badge-list"><tbody>
   <tr data-fans-room="111" data-fans-level="12" data-fans-intimacy="13968.9" data-fans-rank="2928" data-fans-delwaittime="10">
@@ -89,13 +89,13 @@ async function testThirdLevelOpenedRefreshes() {
     env.api.create();
     await tick(); await tick(); await tick();
     const before = env.stats.fetch;
-    env.win.document.dispatchEvent(new env.win.CustomEvent("DouyuEx:thirdLevelOpened", {
+    env.win.document.dispatchEvent(new env.win.CustomEvent("DouyuX:thirdLevelOpened", {
         detail: { panel: env.win.document.querySelector(".fans-continue-panel") }
     }));
     await tick(); await tick();
     assert.strictEqual(env.stats.fetch, before + 1, "悬停/快捷键打开也必须触发一次刷新，实际 +" + (env.stats.fetch - before));
     // 其它面板打开事件不该触发续牌刷新
-    env.win.document.dispatchEvent(new env.win.CustomEvent("DouyuEx:thirdLevelOpened", {
+    env.win.document.dispatchEvent(new env.win.CustomEvent("DouyuX:thirdLevelOpened", {
         detail: { panel: env.win.document.createElement("div") }
     }));
     await tick();
@@ -110,8 +110,8 @@ function testNoPanelRefreshesOnlyOnClickPath() {
     const fsx = require("fs");
     const popup = fsx.readFileSync(path.join(path.join(__dirname, ".."), "src/packages/PopupPlayer/PopupPlayer.js"), "utf8");
     const update = fsx.readFileSync(path.join(path.join(__dirname, ".."), "src/packages/Update/Update.js"), "utf8");
-    assert.ok(popup.indexOf("DouyuEx:thirdLevelOpened") !== -1, "同屏播放面板必须监听统一打开事件（悬停打开也要重画）");
-    assert.ok(update.indexOf("DouyuEx:thirdLevelOpened") !== -1, "版本更新面板必须监听统一打开事件（悬停打开也要熄灭红点）");
+    assert.ok(popup.indexOf("DouyuX:thirdLevelOpened") !== -1, "同屏播放面板必须监听统一打开事件（悬停打开也要重画）");
+    assert.ok(update.indexOf("DouyuX:thirdLevelOpened") !== -1, "版本更新面板必须监听统一打开事件（悬停打开也要熄灭红点）");
     console.log("✓ ④ 通过: 其它面板不再把刷新只写在点击路径里");
 }
 

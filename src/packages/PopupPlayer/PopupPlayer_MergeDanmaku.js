@@ -192,9 +192,9 @@ function MergeDanmaku_bootstrap() {
     /* 接上引擎 ≠ 能贴横条：render 不在原型上时包装会失败，飘屏就永远没有来源标识。
        这种"看着成功、实际缺功能"的状态必须说出来，否则只能靠人肉对比才发现。 */
     if (wrapped) {
-      console.log("[DouyuEx] 多屏弹幕合并已接入原生引擎");
+      console.log("[DouyuX] 多屏弹幕合并已接入原生引擎");
     } else {
-      console.warn("[DouyuEx] 多屏弹幕合并已接上弹幕引擎，但渲染器没能包装（render 不在原型上？）：" +
+      console.warn("[DouyuX] 多屏弹幕合并已接上弹幕引擎，但渲染器没能包装（render 不在原型上？）：" +
         "**飘屏的来源横条不会显示**；聊天区横条不受影响。可用 MergeDanmaku_getStats() 看 rendererWrapped。");
     }
   }
@@ -254,13 +254,13 @@ function MergeDanmaku_startBootstrap() {
       msBootTimer = 0;
       // 引擎接上了、播放器自己的管线没接上：留一条线索，别让它静默降级
       if (engineReady && !hostReady) {
-        console.warn("[DouyuEx] 未能接入播放器自己的弹幕管线（React fiber 上溯失败），" +
+        console.warn("[DouyuX] 未能接入播放器自己的弹幕管线（React fiber 上溯失败），" +
           "其它房间的弹幕暂按自建数据上屏：颜色与来源横条正常，粉丝牌/等级/贵族底不显示。");
       } else if (!engineReady) {
         /* 引擎没抓到也必须留痕：否则"整场没有来源横条"只会被当成功能没生效，
            而且没人知道已经放弃了 60 秒。 */
         msBootExpired = true;
-        console.warn("[DouyuEx] 多屏弹幕合并自举到期：" + msBootTries + " 次仍未抓到原生弹幕引擎" +
+        console.warn("[DouyuX] 多屏弹幕合并自举到期：" + msBootTries + " 次仍未抓到原生弹幕引擎" +
           "（弹幕层关着或没有飘屏都算），来源横条暂不可用；其它房间的弹幕仍会经 socketProxy.socketStream 合入。" +
           "下一次其它房间的报文到来时会自动再试一次。ready=" +
           (msMergeSpace && msMergeCtors.scroll ? "true" : "false") +
@@ -359,7 +359,7 @@ function MergeDanmaku_getHost() {
   if (msMergeHost && typeof msMergeHost.convertComment === "function" && msMergeHost.cm) return msMergeHost;
   msMergeHost = MergeDanmaku_findHostByFiber();
   msMergeHostVia = msMergeHost ? "fiber" : null;
-  if (msMergeHost) console.log("[DouyuEx] 已接入播放器自己的弹幕管线（粉丝牌/等级/贵族样式走原生）");
+  if (msMergeHost) console.log("[DouyuX] 已接入播放器自己的弹幕管线（粉丝牌/等级/贵族样式走原生）");
   return msMergeHost;
 }
 
@@ -373,9 +373,9 @@ function initPkg_PopupPlayer_MergeDanmaku() {
     用户在页面控制台里读不到（实测：沙箱里是 function、页面控制台是 undefined），
     而排障话术是"控制台执行 MergeDanmaku_getStats()"。
     ⚠ 必须挂在这里而不是模块顶层：同一句放在顶层实测**不生效**（页面 window 上连属性都没有），
-    放到 init 阶段就生效 —— 与本文件里 __onDouyuExDanmakuRendered 的做法一致。 */
+    放到 init 阶段就生效 —— 与本文件里 __onDouyuXDanmakuRendered 的做法一致。 */
   W.MergeDanmaku_getStats = window.MergeDanmaku_getStats;
-  W.__onDouyuExDanmakuRendered = function (cm) {
+  W.__onDouyuXDanmakuRendered = function (cm) {
     try {
       MergeDanmaku_onRendered(cm);
     } catch (e) {
@@ -736,7 +736,7 @@ let msWarnedNoStream = false;
 function MergeDanmaku_warnNoStream() {
   if (msWarnedNoStream) return;
   msWarnedNoStream = true;
-  console.warn("[DouyuEx] 一直没等到 socketProxy.socketStream（斗鱼自己的报文入口），" +
+  console.warn("[DouyuX] 一直没等到 socketProxy.socketStream（斗鱼自己的报文入口），" +
     "这段时间其它房间的弹幕只在飘屏显示、聊天区没有对应条目；等它出现会自动恢复正常。");
 }
 
@@ -868,7 +868,7 @@ function MergeDanmaku_push(item) {
     const now = Date.now();
     if (now - msRateWarnAt >= MS_MERGE_RATE_WARN_MS) {
       msRateWarnAt = now;
-      console.warn("[DouyuEx] 其它房间的弹幕超过 " + MS_MERGE_RATE_MAX + " 条/秒，超出的已丢弃（累计 " +
+      console.warn("[DouyuX] 其它房间的弹幕超过 " + MS_MERGE_RATE_MAX + " 条/秒，超出的已丢弃（累计 " +
         msMergeStats.dropped + " 条）；比例与入口状态看 MergeDanmaku_getStats() 的 pushed / viaBus / streamVia。");
     }
     return false;

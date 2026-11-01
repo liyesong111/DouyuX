@@ -405,7 +405,7 @@ function PictureInPictureControl_getMenuHtml() {
                         <span class="ex-pip-opt__body">
                             <span class="ex-pip-opt__row">
                                 <span class="ex-pip-opt__label">增强版画中画</span>
-                                <span class="ex-pip-opt__mark">DouyuEx</span>
+                                <span class="ex-pip-opt__mark">DouyuX</span>
                             </span>
                             <span class="ex-pip-opt__hint">带弹幕，可窗口发弹幕</span>
                         </span>

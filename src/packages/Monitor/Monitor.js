@@ -19,7 +19,7 @@ const MONITOR_ENTRY_ENABLED = false;
 function initPkg_Monitor() {
 	// 入口已撤：不建 DOM、不绑点击。保留空初始化是为了 main.js 的接线契约不变。
 	if (!MONITOR_ENTRY_ENABLED) {
-		console.info("[DouyuEx] 「在线弹幕助手」入口已撤下：第三方数据站可用性无保证");
+		console.info("[DouyuX] 「在线弹幕助手」入口已撤下：第三方数据站可用性无保证");
 		return;
 	}
 	initPkg_Monitor_Dom();

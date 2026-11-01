@@ -76,7 +76,7 @@ function CameraControl_create(options) {
         const label = prefix || "截图";
         const text = CameraCapture_failureText(outcome);
         if (typeof console !== "undefined" && console.error) {
-            console.error("[DouyuEx][" + label + "] 失败：" + text);
+            console.error("[DouyuX][" + label + "] 失败：" + text);
         }
         notifyUser("【" + label + "】失败：" + text, "error");
     }

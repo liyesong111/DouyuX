@@ -5,7 +5,7 @@ let PopupPlayer_refreshBound = false;
 function PopupPlayer_bindRefresh() {
   if (PopupPlayer_refreshBound) return;
   PopupPlayer_refreshBound = true;
-  document.addEventListener("DouyuEx:thirdLevelOpened", function (ev) {
+  document.addEventListener("DouyuX:thirdLevelOpened", function (ev) {
     var panel = ev && ev.detail && ev.detail.panel;
     if (panel && panel.classList && panel.classList.contains("popup-player-panel")) {
       if (typeof PopupPlayer_renderMultiPage === "function") PopupPlayer_renderMultiPage();

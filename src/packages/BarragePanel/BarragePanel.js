@@ -45,8 +45,8 @@ function barragePanel__replaceImageDanmakuInPanel() {
     const contentDom = document.getElementsByClassName("danmuContent-25f266")[0];
     if (!contentDom) return;
     const oldText = contentDom.innerHTML;
-    if (!oldText.includes(`[DouyuEx图片`)) return;
-    const newText = oldText.replace(/\[DouyuEx图片(.*?)\]/g, (match, str) => getImageDanmakuHtml(str));
+    if (!oldText.includes(`[DouyuX图片`)) return;
+    const newText = oldText.replace(/\[DouyuX图片(.*?)\]/g, (match, str) => getImageDanmakuHtml(str));
     if (newText !== oldText) contentDom.innerHTML = newText;
 }
 
@@ -400,16 +400,16 @@ function getUserUid(name) {
                     finish(fan[0].user_id);
                 },
                 onerror: function(err) {
-                    console.warn("[DouyuEx] 查弹幕接口请求失败：" + ((err && err.message) || err));
+                    console.warn("[DouyuX] 查弹幕接口请求失败：" + ((err && err.message) || err));
                     finish("");
                 },
                 ontimeout: function() {
-                    console.warn("[DouyuEx] 查弹幕接口超时");
+                    console.warn("[DouyuX] 查弹幕接口超时");
                     finish("");
                 }
             });
         } catch (e) {
-            console.warn("[DouyuEx] 查弹幕请求无法发起：" + ((e && e.message) || e));
+            console.warn("[DouyuX] 查弹幕请求无法发起：" + ((e && e.message) || e));
             finish("");
         }
     });

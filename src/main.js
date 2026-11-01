@@ -148,7 +148,7 @@ function initPkg_Safe(name, fn) {
     if (typeof fn === "function") fn();
   } catch (e) {
     const err = e || {};
-    console.error("[DouyuEx] 初始化失败：" + name + " —— " + (err.message || err));
+    console.error("[DouyuX] 初始化失败：" + name + " —— " + (err.message || err));
   }
 }
 function initPkg_Timer() {

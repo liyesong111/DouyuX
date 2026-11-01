@@ -7,7 +7,7 @@ const GUARD_PATH = path.join(ROOT, "src/require/XGuard/XGuard.js");
 const SRC = fs.readFileSync(GUARD_PATH, "utf8");
 const BUILT_PATH = fs.existsSync(path.join(ROOT, "DouyuX.user.js"))
   ? path.join(ROOT, "DouyuX.user.js")
-  : path.join(ROOT, "DouyuEx_RL.user.js");
+  : path.join(ROOT, "DouyuX.user.js");
 
 /**
  * ExGuard 顶层 TDZ 回归（2026-11-01 真机排查发现）：
@@ -49,7 +49,7 @@ function testEarlyCallNoThrow() {
   assert.strictEqual(env.api.earlyThrew, null,
     "声明语句执行之前调用 ExGuard_warn 不得抛错（修复前是 TDZ ReferenceError）");
   assert.strictEqual(env.logs.length, 1, "早跑那一条仍然要真的打出来（不是被静默吞掉）");
-  assert.ok(env.logs[0].indexOf("[DouyuEx]") === 0, "告警前缀保持不变");
+  assert.ok(env.logs[0].indexOf("[DouyuX]") === 0, "告警前缀保持不变");
   console.log("✓ ① 通过: 顶层提前调用 ExGuard_warn 不再抛 TDZ，且告警照常输出");
 }
 

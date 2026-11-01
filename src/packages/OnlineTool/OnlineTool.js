@@ -709,7 +709,7 @@ function bindMonitorQueryEvents(panel) {
         renderMonitorGiftChart(res && (res.items || res.gifts || res.list || res));
       }
     }).catch(function (err) {
-      console.warn("[DouyuEx][监控室] 礼物统计查询失败:", err);
+      console.warn("[DouyuX][监控室] 礼物统计查询失败:", err);
       if (chartContainer) {
         var isRateLimit = err && (err.status === 429 || (err.message && err.message.indexOf("频繁") !== -1));
         chartContainer.innerHTML = '<div class="monitor-query__status">' + (isRateLimit ? '查询过于频繁，请稍后重试' : '请求失败，请稍后重试') + '</div>';
@@ -797,14 +797,14 @@ function bindMonitorQueryEvents(panel) {
             renderMonitorData(data);
           }
         }).catch(function (err) {
-          console.warn("[DouyuEx][监控室] 查询请求失败:", err);
+          console.warn("[DouyuX][监控室] 查询请求失败:", err);
           if (tbody) {
             tbody.innerHTML = '<tr><td colspan="6" class="monitor-query__status">请求失败，请稍后重试</td></tr>';
           }
         });
       }
     } catch (err) {
-      console.warn("[DouyuEx][监控室] 执行查询异常:", err);
+      console.warn("[DouyuX][监控室] 执行查询异常:", err);
     }
   }
 
@@ -888,7 +888,7 @@ function requestMonitorApi(url, options) {
   options = options || {};
   return new Promise(function (resolve, reject) {
     if (typeof GM_xmlhttpRequest !== "function") {
-      console.warn("[DouyuEx][监控室] 当前环境缺少 GM_xmlhttpRequest");
+      console.warn("[DouyuX][监控室] 当前环境缺少 GM_xmlhttpRequest");
       reject(new Error("GM_xmlhttpRequest 不可用"));
       return;
     }

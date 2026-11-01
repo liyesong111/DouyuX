@@ -207,7 +207,7 @@ async function WatchPoints_poll() {
     else {
       failed++;
       if (typeof console !== "undefined" && console.warn) {
-        console.warn("[DouyuEx] 看播积分领取失败:", claimable[i], r && (r.msg || r.error));
+        console.warn("[DouyuX] 看播积分领取失败:", claimable[i], r && (r.msg || r.error));
       }
     }
   }
@@ -224,7 +224,7 @@ async function WatchPoints_poll() {
   }
   if (WatchPoints_allClaimed()) WatchPoints_goIdle();
   if (failed && !got && typeof console !== "undefined" && console.warn) {
-    console.warn("[DouyuEx] 看播积分本次没有领取成功，下一轮再试");
+    console.warn("[DouyuX] 看播积分本次没有领取成功，下一轮再试");
   }
 }
 

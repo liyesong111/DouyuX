@@ -80,7 +80,7 @@ function testPasteAfterLateRender() {
         }
     });
     doc.dispatchEvent(paste);
-    assert.ok(String(ta.value).indexOf("[DouyuEx图片上传中]") !== -1, "粘贴图片必须落占位符（旧实现闭包里是 null，整场失效），实际 " + JSON.stringify(ta.value));
+    assert.ok(String(ta.value).indexOf("[DouyuX图片上传中]") !== -1, "粘贴图片必须落占位符（旧实现闭包里是 null，整场失效），实际 " + JSON.stringify(ta.value));
     env.dom.window.close();
     console.log("✓ ① 通过: 晚渲染的聊天框也能粘贴");
 }

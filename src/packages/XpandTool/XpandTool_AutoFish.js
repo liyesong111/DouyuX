@@ -172,7 +172,7 @@ function ExpandTool_AutoFish_insertFunc() {
           }
         }
       } catch (err) {
-        console.error("[DouyuEx] 自动钓鱼轮询异常:", err);
+        console.error("[DouyuX] 自动钓鱼轮询异常:", err);
       } finally {
         const stillRunning = document.getElementById("extool__autofish_start")?.checked;
         if (stillRunning) {

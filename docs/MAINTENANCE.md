@@ -67,7 +67,7 @@ DouyuX/
 1. **主上下文 WebSocket 原型劫持**：在页面初始化最早期劫持原生 WebSocket，截获 `ranklist`、`dayrk`、`weekrk`、`monthrk`、`totalrk` 数据包；
 2. **双重反转义 STT 解码**：准确解析复杂昵称、排位与亲密度贡献值；
 3. **拟态注入与色阶计算**：实时对齐现代斗鱼排行榜 DOM 容器，将贡献值数值注入在行末右侧偏移（`valueRightOffset: 22px`），并赋予渐变色阶；
-4. **广播通道**：对外挂载 `window.__onDouyuExChatmsg`，为弹幕屏蔽词核验提供底层事件源。
+4. **广播通道**：对外挂载 `window.__onDouyuXChatmsg`，为弹幕屏蔽词核验提供底层事件源。
 
 ### 3.3 优雅 WebRTC P2P 阻断器 (`GracefulP2PBlocker`)
 - 在 `ExpandTool_P2P.js` 中实现标准 W3C Mock 代理对象，静默阻断 `RTCPeerConnection` 所有上行推流通道，杜绝官方播放器因空原型而抛出 `TypeError` 崩溃。
@@ -101,7 +101,7 @@ DouyuX/
 
 ### 4.4 弹幕发送回执与屏蔽词检测系统 SSOT (`BarrageSendCheck.js`)
 - **队列机制**：采用 FIFO 队列 `pendingDanmakuList`，记录自身发送弹幕的纯文本内容与时间戳；
-- **双通道核验**：监听 `window.__onDouyuExChatmsg` 原生 WebSocket 广播回执包；
+- **双通道核验**：监听 `window.__onDouyuXChatmsg` 原生 WebSocket 广播回执包；
 - **800ms 敏捷超时**：超时未收到广播回执触发灰色删除线与 `(可能发送失败)` 悬停标签；若网络抖动迟到回执，系统自动自愈解除删除线。
 
 ---

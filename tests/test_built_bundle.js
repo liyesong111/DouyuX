@@ -98,8 +98,8 @@ async function testBuiltBundle() {
     // 等待路由初始化完成 (1000ms + 1500ms 后 d() 会被调用)
     await new Promise(r => setTimeout(r, 3200));
     assert.strictEqual(errors.length, 0, "运行期间不应该产生未捕获异常: " + JSON.stringify(errors));
-    assert.strictEqual(typeof win.__onDouyuExChatmsg, "function", "全局 __onDouyuExChatmsg 必须成功挂载");
-    console.log("✓ 路由调度与 __onDouyuExChatmsg 初始化成功");
+    assert.strictEqual(typeof win.__onDouyuXChatmsg, "function", "全局 __onDouyuXChatmsg 必须成功挂载");
+    console.log("✓ 路由调度与 __onDouyuXChatmsg 初始化成功");
 
     const list = win.document.getElementById("js-barrage-list");
     assert.ok(list, "#js-barrage-list 节点必须存在");
@@ -113,7 +113,7 @@ async function testBuiltBundle() {
 
     // 模拟 100ms 后收到 WebSocket chatmsg 报文
     await new Promise(r => setTimeout(r, 100));
-    win.__onDouyuExChatmsg("type@=chatmsg/rid@=9999/uid@=888888/nn@=测试大神/txt@=加油冲呀！/");
+    win.__onDouyuXChatmsg("type@=chatmsg/rid@=9999/uid@=888888/nn@=测试大神/txt@=加油冲呀！/");
 
     // 等待 950ms 超时判定
     await new Promise(r => setTimeout(r, 950));
@@ -161,7 +161,7 @@ async function testBuiltBundle() {
 
     // 服务端仅广播一次回执
     await new Promise(r => setTimeout(r, 60));
-    win.__onDouyuExChatmsg("type@=chatmsg/rid@=9999/uid@=888888/nn@=测试大神/txt@=重渲染双节点弹幕/cid@=dup1/");
+    win.__onDouyuXChatmsg("type@=chatmsg/rid@=9999/uid@=888888/nn@=测试大神/txt@=重渲染双节点弹幕/cid@=dup1/");
 
     await new Promise(r => setTimeout(r, 950));
     assert.strictEqual(liDup1.querySelector(".Barrage-content").style.textDecoration, "", "重渲染第 1 个节点不得被误判");
@@ -177,7 +177,7 @@ async function testBuiltBundle() {
     list.appendChild(liEsc);
     await new Promise(r => setTimeout(r, 60));
     // 协议中 "/" 被转义为 "@S"
-    win.__onDouyuExChatmsg("type@=chatmsg/rid@=9999/uid@=888888/nn@=测试大神/txt@=1@S2 走起/cid@=esc1/");
+    win.__onDouyuXChatmsg("type@=chatmsg/rid@=9999/uid@=888888/nn@=测试大神/txt@=1@S2 走起/cid@=esc1/");
     await new Promise(r => setTimeout(r, 950));
     assert.strictEqual(liEsc.querySelector(".Barrage-content").style.textDecoration, "", "含 / 的弹幕经 @S 反转义后不得被误判");
     console.log("✓ 测试场景 2.2 通过: @S/@A 转义文本反转义正确，不产生误判");

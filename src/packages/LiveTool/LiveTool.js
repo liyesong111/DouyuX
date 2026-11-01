@@ -7,7 +7,7 @@ function LiveTool_tryInit(name, fn) {
 	try {
 		if (typeof fn === "function") fn();
 	} catch (e) {
-		console.error("[DouyuEx] 直播间工具初始化失败：" + name + " —— " + ((e && e.message) || e));
+		console.error("[DouyuX] 直播间工具初始化失败：" + name + " —— " + ((e && e.message) || e));
 	}
 }
 
@@ -51,7 +51,7 @@ function LiveTool_barrageHandlers() {
 
 function LiveTool_reportHandlerError(name, err) {
 	let e = err || {};
-	console.error("[DouyuEx] 弹幕处理器异常：" + name + " —— " + (e.message || e));
+	console.error("[DouyuX] 弹幕处理器异常：" + name + " —— " + (e.message || e));
 }
 
 /**
@@ -126,7 +126,7 @@ function LiveTool_keywordRuleHit(key, txt) {
 		try {
 			regObj = new RegExp(rule.source, "g");
 		} catch (e) {
-			console.warn("[DouyuEx] 无效的正则关键词规则（已跳过）：" + key + " —— " + ((e && e.message) || e));
+			console.warn("[DouyuX] 无效的正则关键词规则（已跳过）：" + key + " —— " + ((e && e.message) || e));
 			return false;
 		}
 		// 正则不命中时 exec 返回 null —— 必须先判空，再取 result[0]

@@ -110,7 +110,7 @@
 
     // 新版报文把嵌套内容双重转义（"@=" 在嵌套层写作 "@AA="，"@" 写作 "@A"，"/" 写作 "@S"），
 
-    // 旧式单遍解析器（含 DouyuEx 的 el()）无法解析，这就是原插件榜单失效的根因。
+    // 旧式单遍解析器（含 DouyuX 的 el()）无法解析，这就是原插件榜单失效的根因。
 
     // 参考斗鱼前端 chunk 中模块 85067 的解码实现（逐字等价）。
 
@@ -472,9 +472,9 @@
 
                     try {
 
-                        if (typeof window.__onDouyuExChatmsg === "function") {
+                        if (typeof window.__onDouyuXChatmsg === "function") {
 
-                            window.__onDouyuExChatmsg(part);
+                            window.__onDouyuXChatmsg(part);
 
                         }
 
@@ -1326,10 +1326,10 @@
     }
     try {
         var s = document.createElement("script");
-        s.textContent = "(" + runDYRankFix.toString() + ")();\n//# sourceURL=DouyuEx.DYRankFix.js";
+        s.textContent = "(" + runDYRankFix.toString() + ")();\n//# sourceURL=DouyuX.DYRankFix.js";
         (document.head || document.documentElement).appendChild(s);
         s.remove();
     } catch(e) {
-        console.error("[DouyuEx] 活跃榜模块注入失败:", e);
+        console.error("[DouyuX] 活跃榜模块注入失败:", e);
     }
 })();

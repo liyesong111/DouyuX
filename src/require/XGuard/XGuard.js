@@ -54,7 +54,7 @@ function ExGuard_warn(tag, message, err) {
     if (text) detail = " —— " + text;
   }
   try {
-    console.warn("[DouyuEx] " + key + "：" + message + detail);
+    console.warn("[DouyuX] " + key + "：" + message + detail);
   } catch (e) {
     // console 都不可用时无处可写，只能放弃
   }
@@ -125,7 +125,7 @@ function ExGuard_pollFor(findFn, onFound, opts) {
       if (config.quiet) {
         try {
           if (typeof console !== "undefined" && console.debug) {
-            console.debug("[DouyuEx] " + tag + "：等待目标节点 " + seconds + " 秒仍未出现（预期内可缺省，已放弃）");
+            console.debug("[DouyuX] " + tag + "：等待目标节点 " + seconds + " 秒仍未出现（预期内可缺省，已放弃）");
           }
         } catch (e) {}
       } else {

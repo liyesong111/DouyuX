@@ -1,5 +1,5 @@
 /*
-    二次封装postbirdAlertBox，用于DouyuEx内部使用
+    二次封装postbirdAlertBox，用于DouyuX内部使用
     By: 小淳
 */
 

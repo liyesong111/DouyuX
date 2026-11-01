@@ -15,7 +15,7 @@ function Refresh_tryInit(name, fn) {
 		if (typeof ExGuard_warn === "function") {
 			ExGuard_warn("简洁模式", name + " 初始化失败（其余功能照常）", e);
 		} else {
-			console.error("[DouyuEx] 简洁模式初始化失败：" + name + " —— " + ((e && e.message) || e));
+			console.error("[DouyuX] 简洁模式初始化失败：" + name + " —— " + ((e && e.message) || e));
 		}
 		return false;
 	}

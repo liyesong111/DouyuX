@@ -1,5 +1,5 @@
 /*
-   DouyuEx WebSocket
+   DouyuX WebSocket
     By: 小淳
     此处为一些公共函数
 */

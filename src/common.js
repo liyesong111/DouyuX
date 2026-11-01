@@ -24,7 +24,7 @@ function ExLoadLib(url, onSuccess, onError) {
         if (typeof onSuccess === "function") onSuccess();
       } catch (err) {
         EXLIB[url] = 0;
-        console.error("[DouyuEx] 组件加载失败:", url, err);
+        console.error("[DouyuX] 组件加载失败:", url, err);
         if (typeof onError === "function") onError(err);
       }
     },
@@ -41,7 +41,7 @@ function safeBind(target, eventName, handler, options) {
     try {
       handler.call(this, e);
     } catch(err) {
-      console.warn("[DouyuEx] 事件监听执行异常:", eventName, err);
+      console.warn("[DouyuX] 事件监听执行异常:", eventName, err);
     }
   }, options);
 }

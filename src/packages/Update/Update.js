@@ -48,7 +48,7 @@ let Update_seenBound = false;
 function Update_bindSeenOnOpen() {
   if (Update_seenBound) return;
   Update_seenBound = true;
-  document.addEventListener("DouyuEx:thirdLevelOpened", function (ev) {
+  document.addEventListener("DouyuX:thirdLevelOpened", function (ev) {
     var panel = ev && ev.detail && ev.detail.panel;
     if (panel && panel.classList && panel.classList.contains("exupdate-panel") && isNeedUpdate) {
       Update_markRemoteSeen();

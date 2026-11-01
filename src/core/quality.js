@@ -165,10 +165,10 @@
 
     try {
         var s = document.createElement("script");
-        s.textContent = "(" + runSeamlessQuality.toString() + ")();\n//# sourceURL=DouyuEx.SeamlessQuality.js";
+        s.textContent = "(" + runSeamlessQuality.toString() + ")();\n//# sourceURL=DouyuX.SeamlessQuality.js";
         (document.head || document.documentElement).appendChild(s);
         s.remove();
     } catch(e) {
-        console.error("[DouyuEx] 画质系统注入失败:", e);
+        console.error("[DouyuX] 画质系统注入失败:", e);
     }
 })();

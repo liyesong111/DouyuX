@@ -285,18 +285,18 @@ async function run() {
   const dom = makeDom();
   const win = load(dom);
   const W = win;
-  assert.strictEqual(typeof W.__onDouyuExDanmakuRendered, "function", "页面侧渲染钩子必须已安装");
+  assert.strictEqual(typeof W.__onDouyuXDanmakuRendered, "function", "页面侧渲染钩子必须已安装");
 
   const engineSpace = makeSpace();
   const first = fakeComment(win, { text: "主房第一条" }, engineSpace); // 无来源标记 = 主房自己的弹幕
-  W.__onDouyuExDanmakuRendered(first);
+  W.__onDouyuXDanmakuRendered(first);
   assert.strictEqual(W.MergeDanmaku_getStats().ready, true, "喂过一条后引擎必须就绪");
   // 主房弹幕（无来源标记）不得贴横条
   assert.strictEqual(first.display.raw.querySelector(".ex-ms-badge"), null, "主房弹幕绝不能贴来源横条");
 
   // 外房弹幕要贴横条
   const foreign = fakeComment(win, { srcName: "很长的主播昵称", srcRid: "1234", text: "外房来了" }, engineSpace);
-  W.__onDouyuExDanmakuRendered(foreign);
+  W.__onDouyuXDanmakuRendered(foreign);
   const badge = foreign.display.raw.querySelector(".ex-ms-badge");
   assert.ok(badge, "外房弹幕必须贴来源横条");
   assert.strictEqual(badge.textContent, "很长的主播昵称", "飘屏横条必须显示来源主播全名（用户 2026-10-06 定：不再截到 5 字），实际 " + badge.textContent);
@@ -305,12 +305,12 @@ async function run() {
   const holder = foreign.display.raw.querySelector('[class*="textWrap"]');
   assert.strictEqual(holder.firstChild, badge, "横条必须是文本容器的第一个子节点");
   // 幂等：再渲染一次不会叠加
-  W.__onDouyuExDanmakuRendered(foreign);
+  W.__onDouyuXDanmakuRendered(foreign);
   assert.strictEqual(foreign.display.raw.querySelectorAll(".ex-ms-badge").length, 1, "横条必须幂等，不得叠加");
 
   // 渐变弹幕：横条不能落在 background-clip:text 的元素里
   const grad = fakeComment(win, { srcName: "彩色房", gradient: true, text: "彩色弹幕" }, engineSpace);
-  W.__onDouyuExDanmakuRendered(grad);
+  W.__onDouyuXDanmakuRendered(grad);
   const gBadge = grad.display.raw.querySelector(".ex-ms-badge");
   assert.ok(gBadge, "彩色弹幕也必须贴横条");
   assert.strictEqual(gBadge.closest(".barrage-gradient"), null, "横条绝不能落进 .barrage-gradient，否则文字会被裁成透明");
@@ -333,7 +333,7 @@ async function run() {
   console.log("--> 3. 限流");
   const win3 = load(makeDom());
   const c3 = fakeComment(win3, { srcName: "限流房" }, makeSpace());
-  win3.__onDouyuExDanmakuRendered(c3);
+  win3.__onDouyuXDanmakuRendered(c3);
   const bus3 = [];
   win3.socketProxy = { socketStream: { push(p) { bus3.push(p); return this; }, decoder() {}, subscribe() {} } };
   let ok = 0;
@@ -348,7 +348,7 @@ async function run() {
   console.log("--> 4. 聊天区不自拼条目");
   const win4 = load(makeDom());
   const c4 = fakeComment(win4, { srcName: "聊天房" }, makeSpace());
-  win4.__onDouyuExDanmakuRendered(c4);
+  win4.__onDouyuXDanmakuRendered(c4);
   const bus4 = [];
   win4.socketProxy = { socketStream: { push(p) { bus4.push(p); return this; }, decoder() {}, subscribe() {} } };
   const list = win4.document.getElementById("js-barrage-list");
@@ -479,7 +479,7 @@ async function run() {
   const space8 = makeSpace();
   space8._renderer = { dom: container8 };
   const c8 = fakeComment(win8, { srcName: "外房", text: "主房第一条" }, space8);
-  win8.__onDouyuExDanmakuRendered(c8);
+  win8.__onDouyuXDanmakuRendered(c8);
   assert.strictEqual(win8.MergeDanmaku_getStats().ready, true, "引擎必须就绪");
   // 关键：此时**没有任何在飘的弹幕节点**（jsdom 里宽度都是 0），只能靠渲染器容器当锚点
   assert.strictEqual(win8.MergeDanmaku_getHost(), fakeHost, "必须能从引擎容器沿 fiber 爬到弹幕组件");
@@ -525,7 +525,7 @@ async function run() {
   const win9 = load(makeDom());
   const space9 = makeSpace();
   const c9 = fakeComment(win9, { srcName: "无主机" }, space9);
-  win9.__onDouyuExDanmakuRendered(c9);
+  win9.__onDouyuXDanmakuRendered(c9);
   assert.strictEqual(win9.MergeDanmaku_getHost(), null, "没有任何 React fiber 时必须安全返回 null");
   win9.MergeDanmaku_push({ text: "挂起待入口", color: "#ffffff", nn: "A", uid: "1", srcRid: "9", srcName: "无主机", packet: "type@=chatmsg/txt@=挂起待入口/" });
   assert.strictEqual(space9.added.length, 0, "拿不到 host 时也不得自己拼数据喂引擎");
@@ -565,7 +565,7 @@ async function run() {
   // 推一条：必须走总线，且**不得**再走自建数据上屏、不得再克隆聊天条目
   const space9b = makeSpace();
   const c9b = fakeComment(win9b, { srcName: "外房主播" }, space9b);
-  win9b.__onDouyuExDanmakuRendered(c9b);
+  win9b.__onDouyuXDanmakuRendered(c9b);
   assert.strictEqual(win9b.MergeDanmaku_push(item9), true, "推回总线成功必须返回 true");
   assert.strictEqual(busPushes.length, 1, "必须把报文推给原生总线，实际 " + busPushes.length + " 次");
   assert.strictEqual(busPushes[0], pkt9, "推回去的必须是清洗后的原始报文（不能是我们拼的对象）");
@@ -621,14 +621,14 @@ async function run() {
   // ② 原生渲染出来的飘屏：按 (uid+文本) 认领并贴横条
   const injectedCm = fakeComment(win9b, { text: "总线测试", type: "scroll" }, space9b);
   injectedCm.data.extraData = { uid: "555001" };   // 原生管线出来的数据里没有我们的标记
-  win9b.__onDouyuExDanmakuRendered(injectedCm);
+  win9b.__onDouyuXDanmakuRendered(injectedCm);
   const dBadge9 = injectedCm.display.raw.querySelector(".ex-ms-badge");
   assert.ok(dBadge9, "走总线注入的弹幕必须靠 (uid+文本) 认领并贴上来源横条");
   assert.strictEqual(dBadge9.textContent, "外房主播", "飘屏横条文字必须是来源主播名");
   // 认领是消费式的：再来一条同 uid 同文本（非注入）不得被误贴
   const stranger = fakeComment(win9b, { text: "总线测试" }, space9b);
   stranger.data.extraData = { uid: "555001" };
-  win9b.__onDouyuExDanmakuRendered(stranger);
+  win9b.__onDouyuXDanmakuRendered(stranger);
   assert.strictEqual(stranger.display.raw.querySelector(".ex-ms-badge"), null, "已认领过的条目不得被二次匹配（避免误贴）");
 
   // ③ 报文入口还没就位：**挂起**等它（绝不自拼条目），入口一出现原样交过去
@@ -636,7 +636,7 @@ async function run() {
   assert.strictEqual(win9c.MergeDanmaku_getStream(), null, "没有 socketProxy 时必须安全返回 null");
   const space9c = makeSpace();
   const c9c = fakeComment(win9c, { srcName: "晚到房" }, space9c);
-  win9c.__onDouyuExDanmakuRendered(c9c);
+  win9c.__onDouyuXDanmakuRendered(c9c);
   const pkt9c = "type@=chatmsg/rid@=9/uid@=1/nn@=A/txt@=晚到测试/cid@=c9/";
   const item9c = win9c.MergeDanmaku_parseChatmsg({ rid: "9", nn: "晚到房" }, pkt9c);
   assert.strictEqual(win9c.MergeDanmaku_push(item9c), false, "入口没就位时这条不算已上屏");
@@ -655,7 +655,7 @@ async function run() {
   const win9d = load(makeDom());
   const space9d = makeSpace();
   const c9d = fakeComment(win9d, { srcName: "超时房" }, space9d);
-  win9d.__onDouyuExDanmakuRendered(c9d);
+  win9d.__onDouyuXDanmakuRendered(c9d);
   const host9d = { convertComment(raw) { return { type: "scroll", text: raw.txt, space: "scroll", extraData: {} }; }, cm: { send() { return true; } } };
   win9d.__ExDanmuHost = host9d;
   const item9d = win9d.MergeDanmaku_parseChatmsg({ rid: "9", nn: "超时房" }, "type@=chatmsg/rid@=9/uid@=2/nn@=B/txt@=超时测试/cid@=c9d/");

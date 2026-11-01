@@ -15,7 +15,7 @@ const EX_MENU_SURFACE_EXTRA = [
   ".ex-panel",                      /* 二级胶囊菜单（工具条本体） */
   ".ex-icon",                       /* 一级精灵球：展开 / 全部收敛的开关 */
   ".ChatToolBar-DanmakuTail-Panel", /* 弹幕小尾巴面板 */
-  "#ex-vtoolbar-menu",              /* 视频工具条上的 DouyuEx 菜单 */
+  "#ex-vtoolbar-menu",              /* 视频工具条上的 DouyuX 菜单 */
   ".ex-gift-picker-modal",          /* 扩展功能里再打开的礼物选择器 */
   ".ex-gift-picker-mask",           /* 它的遮罩：点遮罩由选择器自己收，不连带收走原有面板 */
   ".ex-pip-menu-root",              /* 加强版画中画菜单 */
@@ -275,7 +275,7 @@ function ExPanel_healDock() {
       if (anchorNow && !ExPanel_isGiftBarHidden()) {
         ExPanel_restoreToGiftBar();
         if (typeof ensureDockIndicators === "function") ensureDockIndicators();
-        console.warn("[DouyuEx] 工具条已从浮动状态归位到礼物流水条");
+        console.warn("[DouyuX] 工具条已从浮动状态归位到礼物流水条");
         return true;
       }
     }
@@ -298,7 +298,7 @@ function ExPanel_healDock() {
     ExPanel_updateFloatingPosition();
     if (typeof ensureDockIndicators === "function") ensureDockIndicators();
   }
-  console.warn("[DouyuEx] 工具条被页面重绘移除，已重新挂回（按钮与事件原样保留）");
+  console.warn("[DouyuX] 工具条被页面重绘移除，已重新挂回（按钮与事件原样保留）");
   return true;
 }
 
@@ -412,7 +412,7 @@ function ExPanel_onGiftBarShow() {
 function initPkg_ExPanel_insertDom() {
   let a = document.createElement("div");
   a.className = "ex-panel";
-  a.innerHTML = `<button type="button" class="ex-panel__close" title="关闭工具条" aria-label="关闭 DouyuEx 工具条">×</button><div class="ex-panel__wrap"></div>`;
+  a.innerHTML = `<button type="button" class="ex-panel__close" title="关闭工具条" aria-label="关闭 DouyuX 工具条">×</button><div class="ex-panel__wrap"></div>`;
 
   let b = ExPanel_getGiftBarAnchor();
   if (!b) {
@@ -675,7 +675,7 @@ function openMiuixPanelCentered(panel, btnEl) {
    * 需要"打开即刷新"的面板（例如一键续牌的徽章与资产）自己监听这条事件 ——
    * 旧实现只在图标点击那条路上调 update，悬停打开时面板就一直是占位符。 */
   try {
-    document.dispatchEvent(new CustomEvent("DouyuEx:thirdLevelOpened", { detail: { panel: panel } }));
+    document.dispatchEvent(new CustomEvent("DouyuX:thirdLevelOpened", { detail: { panel: panel } }));
   } catch (e) {}
 }
 

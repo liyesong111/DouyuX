@@ -10,7 +10,7 @@ function initPkg_VideoTools() {
             // 版本水印只是自证信息，节点不在就跳过；不能让一行 [0].innerHTML 打断模块/事件初始化
             let versionNode = document.getElementsByClassName("disable-23f484")[0];
             if (versionNode) {
-                versionNode.innerHTML = `DouyuEx_${curVersion}`;
+                versionNode.innerHTML = `DouyuX_${curVersion}`;
             } else {
                 ExGuard_warn("视频工具", "未找到版本水印节点（.disable-23f484），版本号未写入（其余功能不受影响）");
             }

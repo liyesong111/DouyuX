@@ -52,7 +52,7 @@ async function Reset_clearGMStorage() {
 async function Reset_run() {
   if (
     !confirm(
-      "确定要清空 DouyuEx 的所有本地设置吗？\n\n包括：油猴存储(GM)与本站 localStorage 中的插件数据。\n此操作不可恢复。"
+      "确定要清空 DouyuX 的所有本地设置吗？\n\n包括：油猴存储(GM)与本站 localStorage 中的插件数据。\n此操作不可恢复。"
     )
   ) {
     return;

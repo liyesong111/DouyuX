@@ -293,7 +293,7 @@ async function runTests() {
         assert.ok(tip.title.indexOf("免登录") !== -1, "悬停提示必须含回执来源通道");
 
         // 同一份判定依据也同步打一条控制台日志
-        const line = logged.filter(function (s) { return s.indexOf("[DouyuEx][弹幕发送检测]") !== -1; })[0] || "";
+        const line = logged.filter(function (s) { return s.indexOf("[DouyuX][弹幕发送检测]") !== -1; })[0] || "";
         assert.ok(line.indexOf("本条文本=这条没收到回执") !== -1, "控制台必须含本条文本");
         assert.ok(line.indexOf("免登录") !== -1, "控制台必须含回执来源通道");
         console.log("✓ Case 11 通过: 判定依据悬停可见 + 同步进控制台，弹幕区可见文案不变");

@@ -100,7 +100,7 @@ function initPkg_DanmakuCollect_Dom() {
     }
     if (++tries > 120) {
       clearInterval(timer);
-      console.warn("[DouyuEx] 等不到弹幕收藏按钮（可能未登录或页面改版），搜索框增强已停止等待");
+      console.warn("[DouyuX] 等不到弹幕收藏按钮（可能未登录或页面改版），搜索框增强已停止等待");
     }
   }, 1000);
 }

@@ -173,7 +173,7 @@ function AccountList_readStore(key) {
         let obj = JSON.parse(raw);
         return (obj && typeof obj === "object") ? obj : {};
     } catch (e) {
-        console.warn("[DouyuEx] 账号存储解析失败，本次按空账本处理:", key, e && e.message);
+        console.warn("[DouyuX] 账号存储解析失败，本次按空账本处理:", key, e && e.message);
         return {};
     }
 }
@@ -284,7 +284,7 @@ function switchAccountPassport(uid, callback) {
        和 parent 侧 switchAccount 同一口径（宁可这次切换不生效，也不毁现场），
        但仍要回调 —— 父页在等 switchOver，不回就永远干等。 */
     if (!l.length) {
-        console.warn("[DouyuEx] passport 侧没有该账号的 cookie 记录，本次不清理、直接收尾:", key);
+        console.warn("[DouyuX] passport 侧没有该账号的 cookie 记录，本次不清理、直接收尾:", key);
         done();
         return;
     }
@@ -394,12 +394,12 @@ function addAccountPassport(uid) {
             }
         }
         if (key !== "null" && sessionUid !== "" && sessionUid !== key) {
-            console.warn("[DouyuEx] 当前 passport 会话属于 " + sessionUid + "，与目标账号 " + key + " 不符，保留已有记录不覆盖");
+            console.warn("[DouyuX] 当前 passport 会话属于 " + sessionUid + "，与目标账号 " + key + " 不符，保留已有记录不覆盖");
             return;
         }
         let exists = AccountList_cookieList(store[key]).length > 0;
         if (exists && private_arr.length === 0) {
-            console.warn("[DouyuEx] 目标账号 " + key + " 的记录非空，但本次没抓到登录态（LTP0），保留原记录");
+            console.warn("[DouyuX] 目标账号 " + key + " 的记录非空，但本次没抓到登录态（LTP0），保留原记录");
             return;
         }
         if (exists

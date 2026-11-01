@@ -62,7 +62,7 @@ function normalizeNick(s) {
 // 因此回执侧与 DOM 侧必须走同一个归一化，对称剥离这些占位符。
 function normalizeDanmakuText(s) {
   return String(s || "")
-    .replace(/\[DouyuEx图片[^\]]+\]/g, "")
+    .replace(/\[DouyuX图片[^\]]+\]/g, "")
     .replace(/\[(?:emot:dy)?[^\]\s]{1,32}\]/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -164,7 +164,7 @@ function markDanmakuFailed(node, contentEl, diagnostic) {
   contentEl.parentNode.insertBefore(tip, contentEl.nextSibling);
 
   if (diagnostic) {
-    try { console.log("[DouyuEx][弹幕发送检测] 判定发送失败：" + diagnostic); } catch (e) {}
+    try { console.log("[DouyuX][弹幕发送检测] 判定发送失败：" + diagnostic); } catch (e) {}
   }
 }
 
@@ -233,10 +233,10 @@ function handleChatmsgPacket(msg, channel) {
 
 function initPkg_LiveTool_BarrageSendCheck() {
   // 双通道接收：主长连接广播 + 免登录代理连接（LiveTool.js 的 Ex_WebSocket_UnLogin）
-  window.__onDouyuExChatmsg = handleChatmsgPacket;
+  window.__onDouyuXChatmsg = handleChatmsgPacket;
   try {
     if (typeof unsafeWindow !== "undefined" && unsafeWindow) {
-      unsafeWindow.__onDouyuExChatmsg = handleChatmsgPacket;
+      unsafeWindow.__onDouyuXChatmsg = handleChatmsgPacket;
     }
   } catch (e) {}
 

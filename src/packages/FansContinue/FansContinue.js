@@ -11,7 +11,7 @@ function initPkg_FansContinue() {
 function FansContinue_bindRefresh() {
   if (FansContinue_refreshBound) return;
   FansContinue_refreshBound = true;
-  document.addEventListener("DouyuEx:thirdLevelOpened", function (ev) {
+  document.addEventListener("DouyuX:thirdLevelOpened", function (ev) {
     var panel = ev && ev.detail && ev.detail.panel;
     if (!panel || !panel.classList) return;
     if (panel.classList.contains("fans-continue-panel")) {
@@ -309,7 +309,7 @@ function createFansContinuePanel() {
   if (typeof ExUI_stickActionBar === "function") ExUI_stickActionBar(p);
 
   // 建好就把数据拉起来：此时面板还没显示，读到结果再显示也就不闪占位符
-  try { updateFansContinuePanel(); } catch (e) { console.warn("[DouyuEx] 续牌面板初次读取失败", e); }
+  try { updateFansContinuePanel(); } catch (e) { console.warn("[DouyuX] 续牌面板初次读取失败", e); }
 
   let saved = localStorage.getItem("ExSave_FansContinue");
   if (saved) {
@@ -402,7 +402,7 @@ function FansContinue_startSend(sendNum) {
               showMessage(`【续牌】房间 ${targetRid} 赠送失败: ${data?.msg || '错误'}`, "error");
             }
           } catch (err) {
-            console.warn("[DouyuEx] 续牌单间异常:", targetRid, err);
+            console.warn("[DouyuX] 续牌单间异常:", targetRid, err);
           }
         }
         showMessage("一键续牌执行完毕！", "success");

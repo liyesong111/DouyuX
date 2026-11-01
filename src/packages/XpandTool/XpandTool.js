@@ -16,7 +16,7 @@ function ExpandTool_tryInit(name, fn) {
     if (typeof ExGuard_warn === "function") {
       ExGuard_warn("扩展功能", name + " 初始化失败（其余模块照常）", e);
     } else {
-      console.error("[DouyuEx] 扩展功能初始化失败：" + name + " —— " + ((e && e.message) || e));
+      console.error("[DouyuX] 扩展功能初始化失败：" + name + " —— " + ((e && e.message) || e));
     }
     return false;
   }

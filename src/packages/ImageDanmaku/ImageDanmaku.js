@@ -3,7 +3,7 @@
     ------------------------------------------------------------
     本轮加固的三处（都属"没有兜底"的同一类问题）：
       1) 上传链：预处理接口只有 onload、XHR 只有 onload —— 失败/超时/结构不对时
-         Promise 永远不 settle，聊天框里那行「[DouyuEx图片上传中]」就永久卡着；
+         Promise 永远不 settle，聊天框里那行「[DouyuX图片上传中]」就永久卡着；
       2) 两处 1 秒轮询没有上限：节点始终不出现时定时器永久空转；
       3) 初始化裸取节点：聊天工具栏还没渲染时 initPkg_ImageDanmaku_Dom 直接抛，
          把同一次初始化的后续功能一起带走。
@@ -91,8 +91,8 @@ function initPkg_ImageDanmaku_Func() {
         const contentDom = dom.getElementsByClassName("Barrage-content");
         if (!contentDom || contentDom.length === 0) return;
         const text = contentDom[0].innerHTML;
-        if (!text || text.indexOf("[DouyuEx图片") === -1) return;
-        contentDom[0].innerHTML = text.replace(/\[DouyuEx图片(.*?)\]/g, (match, str) => getImageDanmakuHtml(str));
+        if (!text || text.indexOf("[DouyuX图片") === -1) return;
+        contentDom[0].innerHTML = text.replace(/\[DouyuX图片(.*?)\]/g, (match, str) => getImageDanmakuHtml(str));
       });
     },
     Object.assign({ tag: "图片弹幕" }, ImageDanmaku_pollOpts)
@@ -107,8 +107,8 @@ function initPkg_ImageDanmaku_Func() {
         let dom = m[0].addedNodes[0];
         if (!dom || !dom.innerHTML) return;
         const text = dom.innerHTML;
-        if (text.indexOf("[DouyuEx图片") === -1) return;
-        dom.innerHTML = text.replace(/\[DouyuEx图片(.*?)\]/g, (match, str) => getImageDanmakuHtml(str));
+        if (text.indexOf("[DouyuX图片") === -1) return;
+        dom.innerHTML = text.replace(/\[DouyuX图片(.*?)\]/g, (match, str) => getImageDanmakuHtml(str));
       });
     },
     Object.assign({ tag: "图片弹幕" }, ImageDanmaku_pollOpts)
@@ -139,7 +139,7 @@ function initPkg_ImageDanmaku_Func() {
   }
 }
 
-/** 上传并在聊天框里落成 [DouyuEx图片xxx.png]；失败会清掉占位符并留痕 */
+/** 上传并在聊天框里落成 [DouyuX图片xxx.png]；失败会清掉占位符并留痕 */
 function ImageDanmaku_uploadAndInsert(file, chatDom) {
   return new Promise((resolve) => {
     if (!chatDom) {
@@ -147,7 +147,7 @@ function ImageDanmaku_uploadAndInsert(file, chatDom) {
       resolve(false);
       return;
     }
-    chatDom.value += "[DouyuEx图片上传中]";
+    chatDom.value += "[DouyuX图片上传中]";
     ExGuard_withTimeout(getUploadImageUrl(file), 20000, "图片弹幕").then((url) => {
       if (!url) {
         ImageDanmaku_removePlaceholder(chatDom);
@@ -163,7 +163,7 @@ function ImageDanmaku_uploadAndInsert(file, chatDom) {
 
 function ImageDanmaku_removePlaceholder(chatDom) {
   if (!chatDom || typeof chatDom.value !== "string") return;
-  chatDom.value = chatDom.value.replace("[DouyuEx图片上传中]", "");
+  chatDom.value = chatDom.value.replace("[DouyuX图片上传中]", "");
 }
 
 function getImageDanmakuHtml(str) {
@@ -194,7 +194,7 @@ function addImageDanmaku(url, chatDom) {
   }
   const split = url.split(".");
   try {
-    input.value = input.value.replace("[DouyuEx图片上传中]", `[DouyuEx图片${compressImageUrl(split[0])}.${split[1]}]`);
+    input.value = input.value.replace("[DouyuX图片上传中]", `[DouyuX图片${compressImageUrl(split[0])}.${split[1]}]`);
   } catch (e) {
     ExGuard_warn("图片弹幕", "压缩图片地址失败，放弃插入", e);
     ImageDanmaku_removePlaceholder(input);
@@ -308,5 +308,5 @@ function getImageDanmakuFromImgSrc(src) {
   const split = src.split("/");
   const url = split.pop();
   const split2 = url.split(".");
-  return `[DouyuEx图片${compressImageUrl(split2[0])}.${split2[2]}]`;
+  return `[DouyuX图片${compressImageUrl(split2[0])}.${split2[2]}]`;
 }

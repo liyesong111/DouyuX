@@ -16,7 +16,7 @@ function initPkg_FollowList() {
         }
         if (++tries > 120) {
             clearInterval(intID);
-            console.warn("[DouyuEx] 关注列表容器等不到，列表增强本次不启用");
+            console.warn("[DouyuX] 关注列表容器等不到，列表增强本次不启用");
         }
     }, 1000);
 }
@@ -133,7 +133,7 @@ function getFollowList() {
             resolve(ret);
         }).catch((e) => {
             // 没有 .catch 时登录态失效（返回 HTML）会让这个 Promise 永远悬着，面板一片空白
-            console.warn("[DouyuEx] 关注列表读取失败:", e && e.message);
+            console.warn("[DouyuX] 关注列表读取失败:", e && e.message);
             resolve(null);
         })
     })

@@ -1,5 +1,5 @@
 /*
-   DouyuEx WebSocket UnLogin
+   DouyuX WebSocket UnLogin
     By: 小淳
 */
 class Ex_WebSocket_UnLogin {

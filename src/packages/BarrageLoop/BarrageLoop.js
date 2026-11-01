@@ -25,7 +25,7 @@ function BarrageLoop_tryInit(name, fn) {
 		if (typeof ExGuard_warn === "function") {
 			ExGuard_warn("弹幕小助手", "初始化失败：" + name, e);
 		} else {
-			console.error("[DouyuEx] 弹幕小助手初始化失败：" + name, e);
+			console.error("[DouyuX] 弹幕小助手初始化失败：" + name, e);
 		}
 	}
 }
