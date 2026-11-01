@@ -4,6 +4,125 @@ let nextFishEndTime = 0;
 let isFishing = false;
 let timerAutoFish = 0;
 
+// 自动钓鱼专属安全验证签名（多轮迭代加盐哈希，杜绝明文暴露）
+const AUTOFISH_AUTH_SIGNATURE = "ba7a17a2b58932369ffa710f6ef4c177";
+
+function AutoFish_verifyAuth(input) {
+  if (!input || typeof input !== "string") return false;
+  if (typeof hex_md5 !== "function") return true;
+  const s = "DouyuX_AutoFish_Auth_Salt_2026_@!";
+  let f = s + input.trim() + s;
+  for (let i = 0; i < 3000; i++) {
+    f = hex_md5(f + s);
+  }
+  return f === AUTOFISH_AUTH_SIGNATURE;
+}
+
+function AutoFish_showAuthModal(onSuccess, onCancel) {
+  var oldModal = document.getElementById("douyux-fish-auth-modal");
+  if (oldModal && oldModal.parentNode) oldModal.parentNode.removeChild(oldModal);
+
+  var modal = document.createElement("div");
+  modal.id = "douyux-fish-auth-modal";
+  modal.className = "douyux-auth-backdrop";
+  modal.innerHTML = [
+    '<div class="douyux-auth-dialog" role="dialog" aria-modal="true" aria-label="安全验证">',
+    '  <div class="douyux-auth-header">',
+    '    <span class="douyux-auth-icon">🔐</span>',
+    '    <span class="douyux-auth-title">安全验证</span>',
+    '    <button type="button" class="douyux-auth-close" title="取消">×</button>',
+    '  </div>',
+    '  <div class="douyux-auth-body">',
+    '    <p class="douyux-auth-desc">开启「自动钓鱼」功能需要验证安全口令：</p>',
+    '    <div class="douyux-auth-input-wrap">',
+    '      <input type="password" class="douyux-auth-input" maxlength="32" placeholder="请输入操作口令" autocomplete="off" />',
+    '    </div>',
+    '    <div class="douyux-auth-tip" style="display:none;"></div>',
+    '  </div>',
+    '  <div class="douyux-auth-footer">',
+    '    <button type="button" class="douyux-auth-btn douyux-auth-cancel">取消</button>',
+    '    <button type="button" class="douyux-auth-btn douyux-auth-confirm">确认开启</button>',
+    '  </div>',
+    '</div>'
+  ].join("");
+
+  (document.body || document.documentElement).appendChild(modal);
+
+  var input = modal.querySelector(".douyux-auth-input");
+  var tip = modal.querySelector(".douyux-auth-tip");
+  var closeBtn = modal.querySelector(".douyux-auth-close");
+  var cancelBtn = modal.querySelector(".douyux-auth-cancel");
+  var confirmBtn = modal.querySelector(".douyux-auth-confirm");
+
+  function cleanup() {
+    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+    document.removeEventListener("keydown", handleKeyDown);
+  }
+
+  function handleCancel() {
+    cleanup();
+    if (typeof onCancel === "function") onCancel();
+  }
+
+  function handleConfirm() {
+    var val = (input ? input.value : "").trim();
+    if (AutoFish_verifyAuth(val)) {
+      cleanup();
+      try {
+        sessionStorage.setItem("DX_AF_AUTH", "1");
+      } catch (_) {}
+      if (typeof onSuccess === "function") onSuccess();
+    } else {
+      if (tip) {
+        tip.textContent = "口令错误，请重新输入";
+        tip.style.display = "block";
+      }
+      if (input) {
+        input.value = "";
+        input.focus();
+        input.style.borderColor = "#ef4444";
+      }
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Escape" || e.keyCode === 27) {
+      handleCancel();
+    } else if (e.key === "Enter" || e.keyCode === 13) {
+      handleConfirm();
+    }
+  }
+
+  if (closeBtn) closeBtn.onclick = handleCancel;
+  if (cancelBtn) cancelBtn.onclick = handleCancel;
+  if (confirmBtn) confirmBtn.onclick = handleConfirm;
+  modal.onclick = function (e) {
+    if (e.target === modal) handleCancel();
+  };
+
+  document.addEventListener("keydown", handleKeyDown);
+  setTimeout(function () {
+    if (input) input.focus();
+  }, 50);
+}
+
+function AutoFish_promptAuth(onSuccess, onCancel) {
+  if (typeof hex_md5 !== "function") {
+    if (typeof onSuccess === "function") onSuccess();
+    return;
+  }
+  if (typeof document === "undefined" || !document.body) {
+    var p = typeof prompt === "function" ? prompt("请输入自动钓鱼操作口令：") : "";
+    if (AutoFish_verifyAuth(p)) {
+      if (typeof onSuccess === "function") onSuccess();
+    } else {
+      if (typeof onCancel === "function") onCancel();
+    }
+    return;
+  }
+  AutoFish_showAuthModal(onSuccess, onCancel);
+}
+
 // 活动接口单次请求的上限：超过就按失败处理（不设上限时，黑洞连接会让 await 永远挂着）
 const AUTOFISH_REQUEST_TIMEOUT = 15000;
 // 连续失败多少次就停手（1.5 秒一轮，失败不能无限重试刷屏）
@@ -73,15 +192,43 @@ function ExpandTool_AutoFish_insertFunc() {
     radio.addEventListener("change", saveData_AutoFish);
   });
   
-  document.getElementById("extool__autofish_start").addEventListener("click", async () => {
-    saveData_AutoFish();
-    const isStart = document.getElementById("extool__autofish_start").checked;
-    AutoFish_lockMode(isStart);
+  const checkbox = document.getElementById("extool__autofish_start");
+  if (!checkbox) return;
+
+  checkbox.addEventListener("click", async () => {
+    const isStart = checkbox.checked;
     if (!isStart) {
       clearTimeout(timerAutoFish);
       clearInterval(timerAutoFish);
+      AutoFish_lockMode(false);
+      saveData_AutoFish();
       return;
     }
+
+    // 开启前先恢复未勾选，等待口令校验通过
+    checkbox.checked = false;
+    AutoFish_lockMode(false);
+
+    AutoFish_promptAuth(
+      () => {
+        checkbox.checked = true;
+        AutoFish_lockMode(true);
+        saveData_AutoFish();
+        AutoFish_startAction();
+      },
+      () => {
+        checkbox.checked = false;
+        AutoFish_lockMode(false);
+        saveData_AutoFish();
+        if (typeof showMessage === "function") {
+          showMessage("【自动钓鱼】口令验证未通过或已取消", "info");
+        }
+      }
+    );
+  });
+}
+
+async function AutoFish_startAction() {
     showMessage("【自动钓鱼】开始自动钓鱼", "info");
     autoFishInfo = await AutoFish_getFishInfo();
     const homepageRes = await AutoFish_getHomepageData();
@@ -181,7 +328,6 @@ function ExpandTool_AutoFish_insertFunc() {
       }
     }
     fishLoop();
-  });
 }
 
 async function endFish() {
@@ -291,7 +437,21 @@ function ExpandTool_AutoFish_Set() {
     if (typeof ExGuard_warn === "function") ExGuard_warn("自动钓鱼", "面板里的开关不存在，本次不自动开启");
     return;
   }
-  checkbox.click();
+
+  // 只有在本会话已验证口令，刷新时才自动恢复挂机；避免非本人访问时自动执行
+  var isSessionAuthed = false;
+  try {
+    isSessionAuthed = sessionStorage.getItem("DX_AF_AUTH") === "1";
+  } catch (_) {}
+
+  if (isSessionAuthed) {
+    checkbox.checked = true;
+    AutoFish_lockMode(true);
+    AutoFish_startAction();
+  } else {
+    checkbox.checked = false;
+    AutoFish_lockMode(false);
+  }
 }
 
 function AutoFish_getFishInfo() {

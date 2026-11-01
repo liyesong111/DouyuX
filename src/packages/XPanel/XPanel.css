@@ -4096,3 +4096,156 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     display: block !important;
 }
 
+/* ==========================================================================
+   自动钓鱼安全验证弹窗（密码掩码输入，杜绝明文与旁窥）
+   ========================================================================== */
+.douyux-auth-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(8, 10, 14, 0.72) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 2147483647 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    animation: douyuxAuthFadeIn 0.18s ease-out !important;
+}
+
+@keyframes douyuxAuthFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.douyux-auth-dialog {
+    width: 360px !important;
+    max-width: 92vw !important;
+    background: linear-gradient(150deg, rgba(28, 30, 38, 0.98), rgba(18, 20, 26, 0.99)) !important;
+    border: 1px solid rgba(255, 136, 0, 0.38) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(255, 136, 0, 0.12) !important;
+    padding: 20px 22px !important;
+    color: #E2E8F0 !important;
+    box-sizing: border-box !important;
+    transform: scale(1) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif !important;
+}
+
+.douyux-auth-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+}
+
+.douyux-auth-icon {
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+
+.douyux-auth-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: #F8FAFC !important;
+    flex: 1 !important;
+    letter-spacing: 0.5px !important;
+}
+
+.douyux-auth-close {
+    background: transparent !important;
+    border: none !important;
+    color: #94A3B8 !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+    border-radius: 6px !important;
+    transition: color 0.15s ease, background 0.15s ease !important;
+}
+
+.douyux-auth-close:hover {
+    color: #EF4444 !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+}
+
+.douyux-auth-desc {
+    font-size: 13px !important;
+    color: #94A3B8 !important;
+    margin: 0 0 12px 0 !important;
+    line-height: 1.5 !important;
+}
+
+.douyux-auth-input-wrap {
+    position: relative !important;
+    width: 100% !important;
+}
+
+.douyux-auth-input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: rgba(10, 12, 16, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    color: #FFFFFF !important;
+    font-size: 15px !important;
+    letter-spacing: 2px !important;
+    outline: none !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.douyux-auth-input:focus {
+    border-color: #FF8800 !important;
+    box-shadow: 0 0 0 3px rgba(255, 136, 0, 0.25) !important;
+}
+
+.douyux-auth-tip {
+    color: #EF4444 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    margin-top: 8px !important;
+}
+
+.douyux-auth-footer {
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 10px !important;
+    margin-top: 18px !important;
+}
+
+.douyux-auth-btn {
+    border-radius: 8px !important;
+    padding: 8px 18px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    border: none !important;
+    transition: all 0.2s ease !important;
+}
+
+.douyux-auth-cancel {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #CBD5E1 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.douyux-auth-cancel:hover {
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #F8FAFC !important;
+}
+
+.douyux-auth-confirm {
+    background: linear-gradient(135deg, #FF8800, #E65100) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 14px rgba(230, 81, 0, 0.4) !important;
+}
+
+.douyux-auth-confirm:hover {
+    background: linear-gradient(135deg, #FFA033, #F57C00) !important;
+    box-shadow: 0 6px 18px rgba(255, 136, 0, 0.55) !important;
+    transform: translateY(-1px) !important;
+}
+
+
