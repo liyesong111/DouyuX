@@ -1,5 +1,8 @@
 /* ==================== 极速无缝最高画质拦截系统（原生主上下文全链路接管） ==================== */
 (function() {
+    if (typeof location !== "undefined" && location.hostname && location.hostname.indexOf("douyu.com") === -1) {
+        return;
+    }
     function runSeamlessQuality() {
         "use strict";
         var isMax = false;

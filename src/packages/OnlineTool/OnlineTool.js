@@ -168,7 +168,7 @@ function createLvjiangModal() {
         <div class="lvjiang-modal__spinner"></div>
         <span class="lvjiang-modal__loading-text">正在回源同步最新赛事数据...</span>
       </div>
-      <iframe class="lvjiang-modal__iframe" title="驴酱杯赛事大屏"></iframe>
+      <iframe class="lvjiang-modal__iframe" title="驴酱杯赛事大屏" allow="cross-origin-isolated; fullscreen"></iframe>
     </div>
   `;
   document.body.appendChild(modal);

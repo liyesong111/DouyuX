@@ -191,6 +191,8 @@ function initRouter_FansBadgeList() {
 function initRouter_Xinlvjiang() {
     try {
         window.localStorage.setItem("lvjiang-cup:theme", "dark");
+        window.localStorage.setItem("lvjiang-cup:palette", "crimson");
+        window.localStorage.setItem("lvjiang-cup:appearance", "fortress");
     } catch (_) {}
 
     function applyDarkTheme() {
@@ -198,10 +200,14 @@ function initRouter_Xinlvjiang() {
             if (document.documentElement) {
                 document.documentElement.setAttribute("data-theme", "dark");
                 document.documentElement.dataset.theme = "dark";
+                document.documentElement.dataset.palette = "crimson";
+                document.documentElement.dataset.appearance = "fortress";
                 document.documentElement.style.colorScheme = "dark";
             }
             if (document.body) {
                 document.body.setAttribute("data-theme", "dark");
+                document.body.dataset.theme = "dark";
+                document.body.dataset.palette = "crimson";
             }
         } catch (_) {}
     }
@@ -212,7 +218,7 @@ function initRouter_Xinlvjiang() {
         var style = document.createElement("style");
         style.id = "douyux-xinlvjiang-style";
         style.textContent = [
-            "html, body {",
+            "html, body, .teams-page, .players-page, .site-main, .team-workspace, .lineup-five, .catalog-results {",
             "    background: #141518 !important;",
             "    color: #E2E8F0 !important;",
             "    scrollbar-width: thin !important;",
@@ -236,13 +242,14 @@ function initRouter_Xinlvjiang() {
             ".skip-link {",
             "    display: none !important;",
             "}",
-            "/* 阵容页优化：隐藏左侧 16 战队冗余列表（大屏顶栏已支持秒切战队），阵容居中大视野展示 */",
+            "/* 阵容页优化：隐藏左侧 16 战队冗余列表，阵容居中大视野展示 */",
             ".teams-page .team-workspace {",
             "    display: block !important;",
             "    grid-template-columns: none !important;",
             "    max-width: 1240px !important;",
             "    margin: 0 auto !important;",
             "    padding: 16px 20px 40px !important;",
+            "    background: transparent !important;",
             "}",
             ".teams-page .team-selector-rail {",
             "    display: none !important;",
@@ -250,9 +257,10 @@ function initRouter_Xinlvjiang() {
             ".teams-page .team-detail {",
             "    width: 100% !important;",
             "    max-width: 100% !important;",
+            "    background: transparent !important;",
             "}",
             ".teams-page .team-identity {",
-            "    background: rgba(26, 28, 34, 0.85) !important;",
+            "    background: rgba(26, 28, 34, 0.9) !important;",
             "    border: 1px solid rgba(215, 184, 117, 0.28) !important;",
             "    border-radius: 12px !important;",
             "    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;",
@@ -266,36 +274,46 @@ function initRouter_Xinlvjiang() {
             ".teams-page .team-record .team-milestone {",
             "    color: #D7B875 !important;",
             "}",
-            ".teams-page .roster-five {",
+            ".teams-page .roster-five,",
+            ".teams-page .lineup-five {",
             "    display: flex !important;",
             "    justify-content: center !important;",
             "    align-items: flex-start !important;",
             "    gap: 24px !important;",
             "    flex-wrap: wrap !important;",
             "    padding: 10px 0 30px !important;",
+            "    background: transparent !important;",
             "}",
             ".teams-page .lineup-slot {",
             "    display: flex !important;",
             "    justify-content: center !important;",
             "    min-width: 200px !important;",
+            "    background: transparent !important;",
             "}",
             "/* 选手页（players）布局优化 */",
             ".players-page .site-main {",
             "    max-width: 1300px !important;",
             "    margin: 0 auto !important;",
             "    padding: 16px 20px 40px !important;",
+            "    background: transparent !important;",
             "}",
             ".players-page .catalog-style-gallery {",
-            "    background: rgba(26, 28, 34, 0.8) !important;",
+            "    background: rgba(26, 28, 34, 0.85) !important;",
             "    border: 1px solid rgba(255, 255, 255, 0.08) !important;",
             "    border-radius: 12px !important;",
             "}",
             ".players-page .catalog-results {",
             "    padding-top: 16px !important;",
+            "    background: transparent !important;",
             "}",
             "/* 选手卡片交互与质感：悬停发光、手型指针与微浮起 */",
-            ".player-card {",
+            ".player-card,",
+            ".player-card *,",
+            ".player-card-link,",
+            ".player-card-link * {",
             "    cursor: pointer !important;",
+            "}",
+            ".player-card {",
             "    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease !important;",
             "}",
             ".player-card:hover {",
@@ -303,74 +321,101 @@ function initRouter_Xinlvjiang() {
             "    box-shadow: 0 10px 28px rgba(215, 184, 117, 0.35) !important;",
             "    z-index: 5 !important;",
             "}",
-            ".player-card-link,",
-            ".player-card-link * {",
-            "    cursor: pointer !important;",
-            "}",
-            "/* 资料快览弹窗美化（图 2 模态框）：强制居中、高质感暗黑毛玻璃背景、金边与大阴影 */",
-            ".profile-preview-dialog {",
+            "/* 资料快览弹窗（图 2 模态框）：强制绝对固定居中、暗黑毛玻璃背景、金边与大阴影 */",
+            ".profile-preview-dialog,",
+            "dialog.profile-preview-dialog,",
+            "[data-profile-dialog] {",
             "    position: fixed !important;",
             "    top: 50% !important;",
             "    left: 50% !important;",
             "    transform: translate(-50%, -50%) !important;",
-            "    width: min(1080px, calc(100vw - 32px)) !important;",
-            "    max-height: calc(100vh - 48px) !important;",
-            "    background: rgba(22, 24, 29, 0.96) !important;",
-            "    border: 1px solid rgba(215, 184, 117, 0.35) !important;",
+            "    width: min(980px, calc(100vw - 24px)) !important;",
+            "    max-height: calc(100vh - 36px) !important;",
+            "    background: rgba(20, 22, 27, 0.98) !important;",
+            "    border: 1px solid rgba(215, 184, 117, 0.4) !important;",
             "    border-radius: 16px !important;",
-            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.85) !important;",
-            "    backdrop-filter: blur(20px) !important;",
-            "    -webkit-backdrop-filter: blur(20px) !important;",
-            "    z-index: 99999 !important;",
+            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.92) !important;",
+            "    backdrop-filter: blur(24px) !important;",
+            "    -webkit-backdrop-filter: blur(24px) !important;",
+            "    z-index: 2147483647 !important;",
             "    overflow-y: auto !important;",
             "    padding: 0 !important;",
+            "    margin: 0 !important;",
             "}",
-            ".profile-preview-dialog::backdrop {",
-            "    background: rgba(0, 0, 0, 0.75) !important;",
+            "/* 自建高兼容遮罩层 */",
+            ".lvjiang-custom-backdrop {",
+            "    position: fixed !important;",
+            "    inset: 0 !important;",
+            "    background: rgba(0, 0, 0, 0.78) !important;",
             "    backdrop-filter: blur(6px) !important;",
             "    -webkit-backdrop-filter: blur(6px) !important;",
+            "    z-index: 2147483646 !important;",
+            "    display: none;",
+            "}",
+            ".lvjiang-custom-backdrop.is-active {",
+            "    display: block !important;",
             "}",
             ".profile-preview-toolbar {",
-            "    background: rgba(26, 28, 34, 0.95) !important;",
+            "    background: rgba(26, 28, 34, 0.96) !important;",
             "    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;",
             "    position: sticky !important;",
             "    top: 0 !important;",
             "    z-index: 10 !important;",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    justify-content: space-between !important;",
+            "    padding: 12px 20px !important;",
             "}",
             ".profile-preview-toolbar span {",
             "    color: #CBD5E1 !important;",
             "    font-weight: 600 !important;",
+            "    font-size: 15px !important;",
             "}",
             ".profile-preview-close {",
             "    background: rgba(255, 255, 255, 0.08) !important;",
-            "    border-color: rgba(255, 255, 255, 0.15) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.15) !important;",
             "    color: #CBD5E1 !important;",
+            "    width: 32px !important;",
+            "    height: 32px !important;",
+            "    border-radius: 50% !important;",
+            "    cursor: pointer !important;",
+            "    display: inline-flex !important;",
+            "    align-items: center !important;",
+            "    justify-content: center !important;",
+            "    font-size: 18px !important;",
+            "    line-height: 1 !important;",
             "}",
             ".profile-preview-close:hover {",
-            "    background: rgba(255, 102, 0, 0.2) !important;",
+            "    background: rgba(255, 102, 0, 0.25) !important;",
             "    border-color: #FF6600 !important;",
             "    color: #FF6600 !important;",
             "}",
+            "/* 查看详情按钮高质感橙金渐变 */",
             ".profile-preview-actions .button,",
-            ".profile-preview-actions a.button {",
+            ".profile-preview-actions a.button,",
+            ".profile-preview-actions a {",
             "    background: linear-gradient(135deg, #FF7700, #E65100) !important;",
             "    color: #FFFFFF !important;",
-            "    border: 1px solid rgba(255, 255, 255, 0.2) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.25) !important;",
             "    border-radius: 8px !important;",
             "    font-weight: 600 !important;",
-            "    box-shadow: 0 4px 14px rgba(230, 81, 0, 0.4) !important;",
+            "    box-shadow: 0 4px 14px rgba(230, 81, 0, 0.45) !important;",
             "    cursor: pointer !important;",
+            "    padding: 8px 18px !important;",
+            "    text-decoration: none !important;",
+            "    display: inline-block !important;",
             "    transition: all 0.2s ease !important;",
             "}",
             ".profile-preview-actions .button:hover,",
-            ".profile-preview-actions a.button:hover {",
+            ".profile-preview-actions a.button:hover,",
+            ".profile-preview-actions a:hover {",
             "    background: linear-gradient(135deg, #FF8800, #F57C00) !important;",
-            "    box-shadow: 0 6px 18px rgba(255, 136, 0, 0.6) !important;",
+            "    box-shadow: 0 6px 18px rgba(255, 136, 0, 0.65) !important;",
             "    transform: translateY(-1px) !important;",
             "}",
             "/* 选手详情页返回条美化 */",
             ".profile-return-row {",
-            "    background: rgba(26, 28, 34, 0.8) !important;",
+            "    background: rgba(26, 28, 34, 0.85) !important;",
             "    border: 1px solid rgba(255, 255, 255, 0.08) !important;",
             "    border-radius: 10px !important;",
             "    padding: 12px 18px !important;",
@@ -380,6 +425,7 @@ function initRouter_Xinlvjiang() {
             "    color: #FF8800 !important;",
             "    font-weight: 600 !important;",
             "    text-decoration: none !important;",
+            "    cursor: pointer !important;",
             "}",
             ".back-link:hover {",
             "    text-decoration: underline !important;",
@@ -394,10 +440,19 @@ function initRouter_Xinlvjiang() {
     }
 
     function bindInteractions() {
-        function ensureDialog() {
+        var cachedPreviews = {};
+
+        function ensureModal() {
+            var backdrop = document.querySelector(".lvjiang-custom-backdrop");
+            if (!backdrop) {
+                backdrop = document.createElement("div");
+                backdrop.className = "lvjiang-custom-backdrop";
+                (document.body || document.documentElement).appendChild(backdrop);
+            }
+
             var dlg = document.querySelector("[data-profile-dialog]");
             if (!dlg) {
-                dlg = document.createElement("dialog");
+                dlg = document.createElement("div");
                 dlg.className = "profile-preview-dialog";
                 dlg.setAttribute("aria-label", "资料快览");
                 dlg.setAttribute("data-profile-dialog", "");
@@ -411,37 +466,39 @@ function initRouter_Xinlvjiang() {
                 ].join("\n");
                 (document.body || document.documentElement).appendChild(dlg);
             }
+
+            function closeModal() {
+                dlg.style.setProperty("display", "none", "important");
+                backdrop.classList.remove("is-active");
+                if (typeof dlg.close === "function" && dlg.open) {
+                    try { dlg.close(); } catch (_) {}
+                }
+            }
+
+            backdrop.onclick = closeModal;
+
             var closeBtn = dlg.querySelector("[data-preview-close], .profile-preview-close");
             if (closeBtn && !closeBtn._exBound) {
                 closeBtn._exBound = true;
                 closeBtn.addEventListener("click", function (e) {
                     e.stopPropagation();
-                    if (typeof dlg.close === "function") {
-                        try { dlg.close(); } catch (_) { dlg.style.display = "none"; }
-                    } else {
-                        dlg.style.display = "none";
-                    }
+                    closeModal();
                 });
             }
-            if (!dlg._exBackdropBound) {
-                dlg._exBackdropBound = true;
-                dlg.addEventListener("click", function (e) {
-                    if (e.target === dlg) {
-                        if (typeof dlg.close === "function") {
-                            try { dlg.close(); } catch (_) { dlg.style.display = "none"; }
-                        } else {
-                            dlg.style.display = "none";
-                        }
-                    }
-                });
-            }
-            return dlg;
+
+            document.addEventListener("keydown", function (e) {
+                if (e.key === "Escape" || e.keyCode === 27) {
+                    closeModal();
+                }
+            });
+
+            return { dlg: dlg, backdrop: backdrop, close: closeModal };
         }
 
-        var cachedPreviews = {};
-
         function showProfilePreview(endpointUrl, fallbackUrl) {
-            var dlg = ensureDialog();
+            var modal = ensureModal();
+            var dlg = modal.dlg;
+            var backdrop = modal.backdrop;
             var content = dlg.querySelector("[data-preview-content]");
             if (!content) return;
 
@@ -452,17 +509,8 @@ function initRouter_Xinlvjiang() {
                 '</div>'
             ].join("\n");
 
-            try {
-                if (typeof dlg.showModal === "function") {
-                    if (!dlg.open) dlg.showModal();
-                } else {
-                    dlg.style.display = "block";
-                    dlg.setAttribute("open", "");
-                }
-            } catch (_) {
-                dlg.style.display = "block";
-                dlg.setAttribute("open", "");
-            }
+            dlg.style.setProperty("display", "block", "important");
+            backdrop.classList.add("is-active");
 
             var targetUrl = "";
             try {
@@ -471,8 +519,30 @@ function initRouter_Xinlvjiang() {
                 targetUrl = endpointUrl;
             }
 
+            function attachDetailLink(cnt, fbUrl) {
+                var detailBtn = cnt.querySelector(".profile-preview-actions a");
+                if (detailBtn) {
+                    detailBtn.onclick = function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var dest = detailBtn.href || fbUrl;
+                        if (dest) window.location.assign(dest);
+                    };
+                }
+            }
+
+            function renderHtml(html) {
+                content.innerHTML = html;
+                try {
+                    if (window.LvjiangPlayerProfiles && typeof window.LvjiangPlayerProfiles.mount === "function") {
+                        window.LvjiangPlayerProfiles.mount(content);
+                    }
+                } catch (_) {}
+                attachDetailLink(content, fallbackUrl);
+            }
+
             if (cachedPreviews[targetUrl]) {
-                renderPreviewHtml(cachedPreviews[targetUrl], content, fallbackUrl);
+                renderHtml(cachedPreviews[targetUrl]);
                 return;
             }
 
@@ -483,7 +553,7 @@ function initRouter_Xinlvjiang() {
                 })
                 .then(function (html) {
                     cachedPreviews[targetUrl] = html;
-                    renderPreviewHtml(html, content, fallbackUrl);
+                    renderHtml(html);
                 })
                 .catch(function (err) {
                     var safeLink = fallbackUrl || targetUrl || location.href;
@@ -493,42 +563,25 @@ function initRouter_Xinlvjiang() {
                         '  <a class="button" href="' + safeLink + '" style="background:linear-gradient(135deg,#FF7700,#E65100);color:#FFFFFF;padding:10px 22px;border-radius:8px;font-weight:600;text-decoration:none;display:inline-block;box-shadow:0 4px 14px rgba(230,81,0,0.4);">打开完整资料 →</a>',
                         '</div>'
                     ].join("\n");
+                    attachDetailLink(content, safeLink);
                 });
         }
 
-        function renderPreviewHtml(html, content, fallbackUrl) {
-            content.innerHTML = html;
-            try {
-                if (window.LvjiangPlayerProfiles && typeof window.LvjiangPlayerProfiles.mount === "function") {
-                    window.LvjiangPlayerProfiles.mount(content);
-                }
-            } catch (_) {}
-
-            // 查看详情按钮点击直达
-            var detailBtn = content.querySelector(".profile-preview-actions a.button, .profile-preview-actions a");
-            if (detailBtn) {
-                detailBtn.addEventListener("click", function (e) {
-                    e.preventDefault();
-                    if (detailBtn.href) {
-                        location.href = detailBtn.href;
-                    }
-                });
-            }
-        }
-
+        // 核心：捕获阶段拦截卡片点击
         document.addEventListener("click", function (e) {
             if (!e.target) return;
-            // 点击直播间跳转外链、关闭按钮、表单输入直接放行
+            // 直播间跳转、关闭按钮、表单输入直接放行
             if (e.target.closest && e.target.closest(".card-room-entry, .profile-preview-close, input, select, textarea")) {
                 return;
             }
 
-            // 在快览弹窗内的点击放行
+            // 在快览弹窗内的点击放行或直达
             if (e.target.closest && e.target.closest("[data-profile-dialog]")) {
                 var actionBtn = e.target.closest(".profile-preview-actions a");
                 if (actionBtn && actionBtn.href) {
                     e.preventDefault();
-                    location.href = actionBtn.href;
+                    e.stopPropagation();
+                    window.location.assign(actionBtn.href);
                 }
                 return;
             }
@@ -547,12 +600,24 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // 2. 如果是选手页（players）卡片（无 data-profile-preview），点击整卡直达选手详情页
+            // 2. 如果是选手页（players）卡片（无 data-profile-preview），点击整卡直接跳转选手详情页
             if (link.href) {
                 e.preventDefault();
                 e.stopPropagation();
-                location.href = link.href;
+                window.location.assign(link.href);
                 return;
+            }
+        }, true);
+
+        // 双击阵容卡片直达选手详情页（双重保障）
+        document.addEventListener("dblclick", function (e) {
+            var card = e.target.closest && e.target.closest(".player-card");
+            if (card) {
+                var link = card.querySelector("a.player-card-link") || card.querySelector("a");
+                if (link && link.href) {
+                    e.preventDefault();
+                    window.location.assign(link.href);
+                }
             }
         }, true);
     }

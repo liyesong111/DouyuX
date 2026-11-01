@@ -306,12 +306,14 @@ function setCookie(cookiename, value){
 }
 
 function getCookieValue(name){
-   let arr,reg = new RegExp("(^| )" + name + "=([^;]*)(;|$)");
-    if (arr = document.cookie.match(reg)) {
-        return unescape(arr[2]);
-    } else {
-        return null;
-    }
+	try {
+		if (typeof document === "undefined" || !document || typeof document.cookie !== "string") return "";
+		var arr, reg = new RegExp("(^| )" + name + "=([^;]*)(;|$)");
+		if ((arr = document.cookie.match(reg))) {
+			return unescape(arr[2]);
+		}
+	} catch (_) {}
+	return "";
 }
 function getCCN() {
 	// let cookie = document.cookie;

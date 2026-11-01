@@ -65,6 +65,14 @@
 
 // 核心层标记 勿删
 
+(function () {
+  if (typeof window !== "undefined" && window.location && window.location.hostname && window.location.hostname.indexOf("xinlvjiang.icu") !== -1) {
+    if (typeof initRouter_Xinlvjiang === "function") {
+      initRouter_Xinlvjiang();
+    }
+  }
+})();
+
 function init() {
   // 与 initPkg() 同一口径的逐项隔离。
   // 这 16 步此前是裸平铺直调：任何一处抛异常，它**后面**的初始化就全部不再执行 ——

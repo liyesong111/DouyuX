@@ -1,5 +1,8 @@
 /* ==================== 整合子模块：斗鱼活跃榜贡献值实时注入（原生主上下文极速注入） ==================== */
 (function() {
+    if (typeof location !== "undefined" && location.hostname && location.hostname.indexOf("douyu.com") === -1) {
+        return;
+    }
     function runDYRankFix() {
 (function () {
 
