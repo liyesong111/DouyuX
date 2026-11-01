@@ -399,10 +399,11 @@ function createExUpdatePanel() {
     } else if (st === "upgrade") {
       // 已经走到「前往更新」= 这条通知被处理过，熄灭红点
       Update_markRemoteSeen();
+      var rawScriptUrl = "https://github.com/liyesong111/DouyuX/raw/main/DouyuX.user.js?_t=" + Date.now();
       if (typeof GM_openInTab === "function") {
-        GM_openInTab("https://github.com/liyesong111/DouyuX/raw/main/DouyuX.user.js", { active: true });
+        GM_openInTab(rawScriptUrl, { active: true });
       } else {
-        window.open("https://github.com/liyesong111/DouyuX/raw/main/DouyuX.user.js", "_blank");
+        window.open(rawScriptUrl, "_blank");
       }
     }
   };

@@ -3128,18 +3128,21 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     top: 50% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) scale(0.96) !important;
-    width: min(960px, 92vw) !important;
-    height: min(880px, 94vh) !important;
-    background: linear-gradient(150deg, rgba(28, 30, 35, 0.98), rgba(18, 19, 22, 0.99)) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-radius: 14px !important;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.2) !important;
+    width: min(1120px, 95vw) !important;
+    max-width: 95vw !important;
+    height: min(860px, 92vh) !important;
+    max-height: 92vh !important;
+    min-height: 600px !important;
+    background: linear-gradient(150deg, rgba(24, 26, 32, 0.98), rgba(16, 17, 21, 0.99)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.25) !important;
     z-index: 100041 !important;
     display: none;
     flex-direction: column !important;
     overflow: hidden !important;
     opacity: 0;
-    transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .lvjiang-modal.is-open {
@@ -3150,11 +3153,11 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
 
 .lvjiang-modal__header {
     flex: 0 0 auto !important;
-    height: 48px !important;
+    height: 52px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 0 14px !important;
+    padding: 0 16px !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
     background: rgba(255, 255, 255, 0.02) !important;
     user-select: none !important;
@@ -3163,76 +3166,96 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
 .lvjiang-modal__title-wrap {
     display: flex !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 16px !important;
+}
+
+.lvjiang-modal__brand {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.lvjiang-modal__brand-icon {
+    color: #FF6600 !important;
+    filter: drop-shadow(0 0 6px rgba(255, 102, 0, 0.6)) !important;
 }
 
 .lvjiang-modal__title {
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    color: #F8FAFC !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
     letter-spacing: 0.5px !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6) !important;
 }
 
 .lvjiang-modal__tabs {
     display: flex !important;
     align-items: center !important;
     gap: 4px !important;
-    background: rgba(0, 0, 0, 0.25) !important;
+    background: rgba(0, 0, 0, 0.35) !important;
     padding: 3px !important;
-    border-radius: 8px !important;
-    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .lvjiang-modal__tab {
-    padding: 4px 12px !important;
-    font-size: 12px !important;
+    padding: 5px 14px !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
     color: #94A3B8 !important;
-    border-radius: 6px !important;
+    border-radius: 7px !important;
     cursor: pointer !important;
-    transition: all 0.16s ease !important;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
     border: none !important;
     background: transparent !important;
+    line-height: 1 !important;
 }
 
 .lvjiang-modal__tab:hover {
     color: #FFFFFF !important;
-    background: rgba(255, 255, 255, 0.06) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
 }
 
 .lvjiang-modal__tab.is-active {
     color: #FFFFFF !important;
-    background: #FF6600 !important;
-    box-shadow: 0 2px 8px rgba(255, 102, 0, 0.4) !important;
+    background: linear-gradient(135deg, #FF7700, #FF5500) !important;
+    box-shadow: 0 2px 10px rgba(255, 102, 0, 0.45) !important;
+    font-weight: 600 !important;
 }
 
 .lvjiang-modal__actions {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
 }
 
 .lvjiang-modal__action-btn {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 30px !important;
-    height: 30px !important;
-    border-radius: 6px !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
     background: rgba(255, 255, 255, 0.04) !important;
     color: #94A3B8 !important;
     cursor: pointer !important;
-    transition: all 0.16s ease !important;
-    font-size: 14px !important;
+    transition: all 0.18s ease !important;
     text-decoration: none !important;
 }
 
 .lvjiang-modal__action-btn:hover {
     color: #FFFFFF !important;
-    background: rgba(255, 255, 255, 0.12) !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
+    background: rgba(255, 102, 0, 0.18) !important;
+    border-color: rgba(255, 102, 0, 0.4) !important;
     text-decoration: none !important;
+    transform: translateY(-1px) !important;
+}
+
+.lvjiang-modal__close-btn:hover {
+    color: #FFFFFF !important;
+    background: rgba(239, 68, 68, 0.22) !important;
+    border-color: rgba(239, 68, 68, 0.5) !important;
 }
 
 .lvjiang-modal__body {
@@ -3256,12 +3279,13 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 12px !important;
-    background: #141518 !important;
+    gap: 14px !important;
+    background: rgba(20, 21, 24, 0.92) !important;
+    backdrop-filter: blur(6px) !important;
     color: #94A3B8 !important;
     font-size: 13px !important;
-    z-index: 2 !important;
-    transition: opacity 0.2s ease, visibility 0.2s ease !important;
+    z-index: 10 !important;
+    transition: opacity 0.22s ease, visibility 0.22s ease !important;
 }
 
 .lvjiang-modal__loading.is-hidden {
@@ -3272,12 +3296,19 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
 }
 
 .lvjiang-modal__spinner {
-    width: 28px !important;
-    height: 28px !important;
+    width: 32px !important;
+    height: 32px !important;
     border: 3px solid rgba(255, 102, 0, 0.2) !important;
     border-top-color: #FF6600 !important;
     border-radius: 50% !important;
     animation: lvjiang-spin 0.8s linear infinite !important;
+}
+
+.lvjiang-modal__loading-text {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #CBD5E1 !important;
+    letter-spacing: 0.5px !important;
 }
 
 @keyframes lvjiang-spin {

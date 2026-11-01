@@ -81,11 +81,14 @@ function createLvjiangModal() {
   document.body.appendChild(backdrop);
 
   var modal = document.createElement("div");
-  modal.className = "lvjiang-modal miuix-modal";
+  modal.className = "lvjiang-modal";
   modal.innerHTML = `
     <div class="lvjiang-modal__header">
       <div class="lvjiang-modal__title-wrap">
-        <span class="lvjiang-modal__title">驴酱杯</span>
+        <span class="lvjiang-modal__brand">
+          <svg class="lvjiang-modal__brand-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <span class="lvjiang-modal__title">驴酱杯 · S3</span>
+        </span>
         <div class="lvjiang-modal__tabs">
           <button type="button" class="lvjiang-modal__tab is-active" data-key="schedule">赛程</button>
           <button type="button" class="lvjiang-modal__tab" data-key="teams">阵容</button>
@@ -94,15 +97,21 @@ function createLvjiangModal() {
         </div>
       </div>
       <div class="lvjiang-modal__actions">
-        <button type="button" class="lvjiang-modal__action-btn lvjiang-modal__refresh-btn" title="刷新页面">↻</button>
-        <a href="https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" class="lvjiang-modal__action-btn lvjiang-modal__external-btn" title="在新标签页打开">↗</a>
-        <button type="button" class="lvjiang-modal__action-btn lvjiang-modal__close-btn" title="关闭">✕</button>
+        <button type="button" class="lvjiang-modal__action-btn lvjiang-modal__refresh-btn" title="强制回源刷新 (清除本地缓存)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        </button>
+        <a href="https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" class="lvjiang-modal__action-btn lvjiang-modal__external-btn" title="在新标签页中打开">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </a>
+        <button type="button" class="lvjiang-modal__action-btn lvjiang-modal__close-btn" title="关闭大屏 (ESC)">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
     </div>
     <div class="lvjiang-modal__body">
       <div class="lvjiang-modal__loading">
         <div class="lvjiang-modal__spinner"></div>
-        <span>正在加载赛事数据...</span>
+        <span class="lvjiang-modal__loading-text">正在回源同步最新赛事数据...</span>
       </div>
       <iframe class="lvjiang-modal__iframe" title="驴酱杯赛事大屏"></iframe>
     </div>
@@ -176,6 +185,7 @@ function loadLvjiangContent(key, forceReload) {
   if (loading) {
     loading.classList.remove("is-hidden");
     loading.style.setProperty("display", "flex", "important");
+    loading.style.setProperty("opacity", "1", "important");
   }
 
   var completed = false;
@@ -189,29 +199,26 @@ function loadLvjiangContent(key, forceReload) {
       timer = null;
     }
     if (loading) {
-      loading.classList.add("is-hidden");
-      loading.style.setProperty("display", "none", "important");
+      loading.style.setProperty("opacity", "0", "important");
+      setTimeout(function () {
+        loading.classList.add("is-hidden");
+        loading.style.setProperty("display", "none", "important");
+      }, 220);
     }
   }
 
-  // 安全兜底定时器：2.5 秒内无论如何收起加载遮罩，保证原站内容立即可见
-  timer = setTimeout(finishLoading, 2500);
+  // 安全兜底定时器：2 秒收起遮罩，确保原站立即可见
+  timer = setTimeout(finishLoading, 2000);
 
   iframe.onload = function () {
     finishLoading();
   };
 
-  // 直接设置 iframe.src 加载原站（xinlvjiang.icu 声明了 frame-ancestors *，可跨域安全内嵌且脚本运行正常）
-  if (forceReload) {
-    iframe.removeAttribute("srcdoc");
-    var sep = targetUrl.indexOf("?") !== -1 ? "&" : "?";
-    iframe.src = targetUrl + sep + "_t=" + Date.now();
-  } else if (!iframe.src || iframe.src.indexOf(targetUrl) === -1) {
-    iframe.removeAttribute("srcdoc");
-    iframe.src = targetUrl;
-  } else {
-    finishLoading();
-  }
+  // 必须直接设置 iframe.src 加载原站（xinlvjiang.icu 声明了 frame-ancestors *，可跨域安全内嵌且脚本运行正常）
+  // 关键优化：每次切换标签或刷新强制附带时间戳（_t=Date.now()），彻底穿透 Edge 启发式本地磁盘缓存与 EdgeOne CDN 缓存，确保 16 队伍与最新选手数据秒级同步
+  iframe.removeAttribute("srcdoc");
+  var sep = targetUrl.indexOf("?") !== -1 ? "&" : "?";
+  iframe.src = targetUrl + sep + "_t=" + Date.now();
 }
 
 function openLvjiangModal(key) {
