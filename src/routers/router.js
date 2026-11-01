@@ -1,4 +1,8 @@
 function initRouter(href) {
+    if (String(href).indexOf("xinlvjiang.icu") !== -1) {
+        initRouter_Xinlvjiang();
+        return;
+    }
     // 路由转发
     if (String(href).indexOf("yuba.douyu.com") !== -1) {
         // 鱼吧
@@ -182,4 +186,254 @@ function initRouter_Video() {
 
 function initRouter_FansBadgeList() {
     initPkg_FansBadgeList();
+}
+
+function initRouter_Xinlvjiang() {
+    try {
+        window.localStorage.setItem("lvjiang-cup:theme", "dark");
+    } catch (_) {}
+
+    function applyDarkTheme() {
+        try {
+            if (document.documentElement) {
+                document.documentElement.setAttribute("data-theme", "dark");
+                document.documentElement.dataset.theme = "dark";
+                document.documentElement.style.colorScheme = "dark";
+            }
+            if (document.body) {
+                document.body.setAttribute("data-theme", "dark");
+            }
+        } catch (_) {}
+    }
+    applyDarkTheme();
+
+    function injectXinlvjiangStyles() {
+        if (document.getElementById("douyux-xinlvjiang-style")) return;
+        var style = document.createElement("style");
+        style.id = "douyux-xinlvjiang-style";
+        style.textContent = [
+            "html, body {",
+            "    background: #141518 !important;",
+            "    color: #E2E8F0 !important;",
+            "    scrollbar-width: thin !important;",
+            "    scrollbar-color: rgba(255, 102, 0, 0.4) transparent !important;",
+            "}",
+            "::-webkit-scrollbar {",
+            "    width: 6px !important;",
+            "    height: 6px !important;",
+            "}",
+            "::-webkit-scrollbar-thumb {",
+            "    background: rgba(255, 102, 0, 0.35) !important;",
+            "    border-radius: 3px !important;",
+            "}",
+            "::-webkit-scrollbar-thumb:hover {",
+            "    background: rgba(255, 102, 0, 0.65) !important;",
+            "}",
+            "/* 隐藏原站顶栏与全屏装饰，让 iframe 内部空间全部服务于赛事内容 */",
+            ".site-header,",
+            ".site-scenery,",
+            ".navigation-progress,",
+            ".skip-link {",
+            "    display: none !important;",
+            "}",
+            "/* 阵容页优化：隐藏左侧 16 战队冗余列表（大屏顶栏已支持秒切战队），阵容居中大视野展示 */",
+            ".teams-page .team-workspace {",
+            "    display: block !important;",
+            "    grid-template-columns: none !important;",
+            "    max-width: 1240px !important;",
+            "    margin: 0 auto !important;",
+            "    padding: 16px 20px 40px !important;",
+            "}",
+            ".teams-page .team-selector-rail {",
+            "    display: none !important;",
+            "}",
+            ".teams-page .team-detail {",
+            "    width: 100% !important;",
+            "    max-width: 100% !important;",
+            "}",
+            ".teams-page .team-identity {",
+            "    background: rgba(26, 28, 34, 0.85) !important;",
+            "    border: 1px solid rgba(215, 184, 117, 0.28) !important;",
+            "    border-radius: 12px !important;",
+            "    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;",
+            "    backdrop-filter: blur(12px) !important;",
+            "    padding: 14px 20px !important;",
+            "    margin-bottom: 20px !important;",
+            "}",
+            ".teams-page .team-identity h2 {",
+            "    color: #F8FAFC !important;",
+            "}",
+            ".teams-page .team-record .team-milestone {",
+            "    color: #D7B875 !important;",
+            "}",
+            ".teams-page .roster-five {",
+            "    display: flex !important;",
+            "    justify-content: center !important;",
+            "    align-items: flex-start !important;",
+            "    gap: 24px !important;",
+            "    flex-wrap: wrap !important;",
+            "    padding: 10px 0 30px !important;",
+            "}",
+            ".teams-page .lineup-slot {",
+            "    display: flex !important;",
+            "    justify-content: center !important;",
+            "    min-width: 200px !important;",
+            "}",
+            "/* 选手页（players）布局优化 */",
+            ".players-page .site-main {",
+            "    max-width: 1300px !important;",
+            "    margin: 0 auto !important;",
+            "    padding: 16px 20px 40px !important;",
+            "}",
+            ".players-page .catalog-style-gallery {",
+            "    background: rgba(26, 28, 34, 0.8) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.08) !important;",
+            "    border-radius: 12px !important;",
+            "}",
+            ".players-page .catalog-results {",
+            "    padding-top: 16px !important;",
+            "}",
+            "/* 选手卡片交互与质感：悬停发光、手型指针与微浮起 */",
+            ".player-card {",
+            "    cursor: pointer !important;",
+            "    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease !important;",
+            "}",
+            ".player-card:hover {",
+            "    transform: translateY(-5px) scale(1.02) !important;",
+            "    box-shadow: 0 10px 28px rgba(215, 184, 117, 0.35) !important;",
+            "    z-index: 5 !important;",
+            "}",
+            ".player-card-link,",
+            ".player-card-link * {",
+            "    cursor: pointer !important;",
+            "}",
+            "/* 资料快览弹窗美化（图 2 模态框）：强制居中、高质感暗黑毛玻璃背景、金边与大阴影 */",
+            ".profile-preview-dialog {",
+            "    position: fixed !important;",
+            "    top: 50% !important;",
+            "    left: 50% !important;",
+            "    transform: translate(-50%, -50%) !important;",
+            "    width: min(1080px, calc(100vw - 32px)) !important;",
+            "    max-height: calc(100vh - 48px) !important;",
+            "    background: rgba(22, 24, 29, 0.96) !important;",
+            "    border: 1px solid rgba(215, 184, 117, 0.35) !important;",
+            "    border-radius: 16px !important;",
+            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.85) !important;",
+            "    backdrop-filter: blur(20px) !important;",
+            "    -webkit-backdrop-filter: blur(20px) !important;",
+            "    z-index: 99999 !important;",
+            "    overflow-y: auto !important;",
+            "    padding: 0 !important;",
+            "}",
+            ".profile-preview-dialog::backdrop {",
+            "    background: rgba(0, 0, 0, 0.75) !important;",
+            "    backdrop-filter: blur(6px) !important;",
+            "    -webkit-backdrop-filter: blur(6px) !important;",
+            "}",
+            ".profile-preview-toolbar {",
+            "    background: rgba(26, 28, 34, 0.95) !important;",
+            "    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;",
+            "    position: sticky !important;",
+            "    top: 0 !important;",
+            "    z-index: 10 !important;",
+            "}",
+            ".profile-preview-toolbar span {",
+            "    color: #CBD5E1 !important;",
+            "    font-weight: 600 !important;",
+            "}",
+            ".profile-preview-close {",
+            "    background: rgba(255, 255, 255, 0.08) !important;",
+            "    border-color: rgba(255, 255, 255, 0.15) !important;",
+            "    color: #CBD5E1 !important;",
+            "}",
+            ".profile-preview-close:hover {",
+            "    background: rgba(255, 102, 0, 0.2) !important;",
+            "    border-color: #FF6600 !important;",
+            "    color: #FF6600 !important;",
+            "}",
+            ".profile-preview-actions .button,",
+            ".profile-preview-actions a.button {",
+            "    background: linear-gradient(135deg, #FF7700, #E65100) !important;",
+            "    color: #FFFFFF !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.2) !important;",
+            "    border-radius: 8px !important;",
+            "    font-weight: 600 !important;",
+            "    box-shadow: 0 4px 14px rgba(230, 81, 0, 0.4) !important;",
+            "    cursor: pointer !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".profile-preview-actions .button:hover,",
+            ".profile-preview-actions a.button:hover {",
+            "    background: linear-gradient(135deg, #FF8800, #F57C00) !important;",
+            "    box-shadow: 0 6px 18px rgba(255, 136, 0, 0.6) !important;",
+            "    transform: translateY(-1px) !important;",
+            "}",
+            "/* 选手详情页返回条美化 */",
+            ".profile-return-row {",
+            "    background: rgba(26, 28, 34, 0.8) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.08) !important;",
+            "    border-radius: 10px !important;",
+            "    padding: 12px 18px !important;",
+            "    margin-bottom: 20px !important;",
+            "}",
+            ".back-link {",
+            "    color: #FF8800 !important;",
+            "    font-weight: 600 !important;",
+            "    text-decoration: none !important;",
+            "}",
+            ".back-link:hover {",
+            "    text-decoration: underline !important;",
+            "    color: #FFAA33 !important;",
+            "}"
+        ].join("\n");
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    function bindInteractions() {
+        document.addEventListener("click", function (e) {
+            if (!e.target) return;
+            // 点击关闭按钮、外部直播间链接、输入框等直接放行
+            if (e.target.closest && e.target.closest("button, .card-room-entry, .profile-preview-close, input, select, textarea")) return;
+
+            var card = e.target.closest && e.target.closest(".player-card");
+            if (!card) return;
+
+            var link = card.querySelector("a.player-card-link") || card.querySelector("a");
+            if (!link) return;
+
+            // 1. 如果带有 data-profile-preview（如阵容 teams 页）：若未点在 a 上，派发 click 触发快览弹窗
+            if (link.dataset && link.dataset.profilePreview) {
+                if (e.target !== link && !link.contains(e.target)) {
+                    e.preventDefault();
+                    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+                }
+            } else if (link.href && (!link.dataset || !link.dataset.profilePreview)) {
+                // 2. 如果是选手 catalog 页（无快览属性），点击卡片直接跳转到选手详情页
+                if (e.target !== link && !link.contains(e.target)) {
+                    e.preventDefault();
+                    location.href = link.href;
+                }
+            }
+        }, true);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+            applyDarkTheme();
+            injectXinlvjiangStyles();
+            bindInteractions();
+        });
+    } else {
+        injectXinlvjiangStyles();
+        bindInteractions();
+    }
+
+    // 防御性定期确保暗色模式
+    var checkCount = 0;
+    var themeTimer = setInterval(function () {
+        applyDarkTheme();
+        injectXinlvjiangStyles();
+        checkCount++;
+        if (checkCount > 10) clearInterval(themeTimer);
+    }, 400);
 }

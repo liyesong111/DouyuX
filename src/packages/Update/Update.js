@@ -28,13 +28,17 @@ function Update_noteRemoteVersion(remoteVer) {
   return newer;
 }
 
-/** 按「有新版本 + 该版本还没看过」刷新底栏红点 */
+/** 按「有新版本 + 该版本还没看过」刷新底栏红点与任务栏主图标橙点 */
 function Update_refreshTip() {
-  var tip = document.getElementById("ex-update__tip");
-  if (!tip) return;
   var seen = String(GM_getValue(UPDATE_SEEN_KEY) || "");
   var show = !!(isNeedUpdate && lastestVersion && lastestVersion !== seen);
-  tip.style.display = show ? "block" : "none";
+  var tip = document.getElementById("ex-update__tip");
+  if (tip) {
+    tip.style.display = show ? "block" : "none";
+  }
+  if (typeof ExIcon_showTip === "function") {
+    ExIcon_showTip(show);
+  }
 }
 
 /** 用户已经看过这个远端版本：熄灭红点，且之后同一版本不再亮 */

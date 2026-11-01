@@ -27,6 +27,8 @@
 // @match        *://yuba.douyu.com/*
 // @match        *://v.douyu.com/*
 // @match        *://cz.douyu.com/*
+// @match        *://xinlvjiang.icu/*
+// @match        *://*.xinlvjiang.icu/*
 // @require      https://registry.npmmirror.com/flv.js/1.6.2/files/dist/flv.min.js
 // @require      https://fastly.jsdelivr.net/npm/svgaplayerweb@2.3.1/build/svga.min.js
 // @require      https://registry.npmmirror.com/gif.js/0.2.0/files/dist/gif.js

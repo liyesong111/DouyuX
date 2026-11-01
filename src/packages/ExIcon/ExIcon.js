@@ -3,6 +3,9 @@ const PokeballIcon_svg = `<img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAA2A
 function initPkg_ExIcon() {
 	initPkg_ExIcon_insertDom();
 	initPkg_ExIcon_Func();
+	if (typeof Update_refreshTip === "function") {
+		Update_refreshTip();
+	}
 }
 function initPkg_ExIcon_insertDom() {
 	let a = document.createElement("div");
@@ -44,11 +47,11 @@ function initPkg_ExIcon_Func() {
 	}
 }
 
-// 目前没有调用点（历史遗留），保留但不要埋雷：图标被页面重绘时会取不到点。
+// 任务栏精灵球右上角更新提示橙色小标点
 function ExIcon_showTip(a) {
 	let d = document.getElementById("ex-icon__tip");
 	if (!d) return;
-	if (a == true) {
+	if (a === true) {
 		d.style.display = "block";
 	} else {
 		d.style.display = "none";
