@@ -13,7 +13,7 @@ var lastestVersion = "";
 const UPDATE_SEEN_KEY = "Ex_LastSeenRemoteVersion";
 const UPDATE_KNOWN_KEY = "Ex_LastKnownRemoteVersion";
 const UPDATE_CHECK_TIME_KEY = "Ex_LastUpdateCheckTime";
-const UPDATE_CHECK_INTERVAL_MS = 12 * 3600 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
 /** 记录一次探测结果，并据此刷新红点（只有真的更新才亮） */
 function Update_noteRemoteVersion(remoteVer) {
@@ -152,7 +152,10 @@ function initPkg_Update_Func() {
  */
 
 const UPDATE_VERSION_SOURCES = [
-  // 权威源：GitHub Raw（用户专属仓库 main 分支）
+  // 国内高速镜像代理源（穿透 GFW 阻断与 CDN 12 小时陈旧缓存，实时同步 GitHub main 最新 commit）
+  "https://raw.gitmirror.com/liyesong111/DouyuX/main/package.json",
+  "https://ghfast.top/https://raw.githubusercontent.com/liyesong111/DouyuX/main/package.json",
+  // 权威官方源：GitHub Raw（用户专属仓库 main 分支）
   "https://raw.githubusercontent.com/liyesong111/DouyuX/main/package.json",
   // 备选源：jsDelivr 双节点（分支镜像加速，作兜底容灾）
   "https://fastly.jsdelivr.net/gh/liyesong111/DouyuX@main/package.json",
@@ -422,13 +425,12 @@ function initVersionLifecycleNotice() {
     }
   } catch (e) {}
 
-  // 12 小时限频在线探测
-  var lastCheckTime = Number(GM_getValue(UPDATE_CHECK_TIME_KEY) || 0);
-  var now = Date.now();
-  if (now - lastCheckTime > UPDATE_CHECK_INTERVAL_MS) {
-    // 注意：时间戳**成功后才写**（P2-6）。旧实现在探测之前就写，
-    // 一次离线/被墙就把 12 小时窗口占掉，期间既不再试、也不提示失败。
-    setTimeout(() => {
+  function checkRoutine() {
+    var lastCheckTime = Number(GM_getValue(UPDATE_CHECK_TIME_KEY) || 0);
+    var now = Date.now();
+    if (now - lastCheckTime > UPDATE_CHECK_INTERVAL_MS) {
+      // 注意：时间戳**成功后才写**（P2-6）。旧实现在探测之前就写，
+      // 一次离线/被墙就把窗口占掉，期间既不再试、也不提示失败。
       fetchLatestVersion(function (remoteVer) {
         if (!remoteVer) {
           ExGuard_warn("版本更新", "例行探测失败（可能是网络或更新源不可达），下次启动会重试");
@@ -437,7 +439,27 @@ function initVersionLifecycleNotice() {
         Update_stampCheckTime();
         Update_noteRemoteVersion(remoteVer);
       });
-    }, 5000);
+    }
+  }
+
+  // 1. 启动后延迟执行首次在线探测（1500ms 既不阻塞页面加载，又能尽快探出新版本红点）
+  setTimeout(checkRoutine, 1500);
+
+  // 2. 挂载周期巡检定时器：长开直播间时每 15 分钟自动检测一次，推送新版本后无需用户点检查更新即可自动亮红点
+  if (typeof setInterval === "function") {
+    var timer = setInterval(checkRoutine, UPDATE_CHECK_INTERVAL_MS);
+    if (timer && typeof timer.unref === "function") {
+      timer.unref();
+    }
+  }
+
+  // 3. 标签页由后台切回前台时，按需触发探测
+  if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") {
+        checkRoutine();
+      }
+    });
   }
 }
 

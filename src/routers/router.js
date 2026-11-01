@@ -221,7 +221,7 @@ function initRouter_Xinlvjiang() {
     (function injectEarlyDarkStyle() {
         var s = document.getElementById("douyux-early-dark") || document.createElement("style");
         s.id = "douyux-early-dark";
-        s.textContent = ":root, html, body, .site-main, .player-page, [data-profile-page], .teams-page, .players-page { background: #141518 !important; color-scheme: dark !important; color: #E2E8F0 !important; }";
+        s.textContent = ":root, html, body, dialog, .douyux-dossier-overlay, .douyux-dossier-dialog, .site-main, .player-page, [data-profile-page], .player-dossier, .teams-page, .players-page { background: #141518 !important; color-scheme: dark !important; color: #E2E8F0 !important; }";
         if (!s.parentNode) {
             (document.head || document.documentElement).appendChild(s);
         }
@@ -388,6 +388,155 @@ function initRouter_Xinlvjiang() {
             "    box-shadow: 0 10px 28px rgba(215, 184, 117, 0.35) !important;",
             "    z-index: 5 !important;",
             "}",
+            "/* DouyuX 专属暗黑金边全量详细资料浮层（彻底杜绝 iframe 白屏刷新闪烁） */",
+            ".douyux-dossier-overlay {",
+            "    position: fixed !important;",
+            "    inset: 0 !important;",
+            "    z-index: 2147483640 !important;",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    justify-content: center !important;",
+            "    padding: 16px !important;",
+            "    box-sizing: border-box !important;",
+            "    opacity: 0;",
+            "    pointer-events: none;",
+            "    transition: opacity 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-overlay.is-active {",
+            "    opacity: 1 !important;",
+            "    pointer-events: auto !important;",
+            "}",
+            ".douyux-dossier-backdrop {",
+            "    position: absolute !important;",
+            "    inset: 0 !important;",
+            "    background: rgba(8, 10, 14, 0.86) !important;",
+            "    backdrop-filter: blur(10px) !important;",
+            "    -webkit-backdrop-filter: blur(10px) !important;",
+            "}",
+            ".douyux-dossier-dialog {",
+            "    position: relative !important;",
+            "    width: min(1080px, 100%) !important;",
+            "    max-height: calc(100vh - 36px) !important;",
+            "    background: rgba(20, 22, 27, 0.98) !important;",
+            "    border: 1px solid rgba(215, 184, 117, 0.45) !important;",
+            "    border-radius: 16px !important;",
+            "    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.95), 0 0 40px rgba(215, 184, 117, 0.12) !important;",
+            "    overflow-y: auto !important;",
+            "    color: #E2E8F0 !important;",
+            "    color-scheme: dark !important;",
+            "    display: flex !important;",
+            "    flex-direction: column !important;",
+            "    transform: scale(0.96);",
+            "    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;",
+            "}",
+            ".douyux-dossier-overlay.is-active .douyux-dossier-dialog {",
+            "    transform: scale(1) !important;",
+            "}",
+            ".douyux-dossier-toolbar {",
+            "    background: rgba(26, 28, 34, 0.98) !important;",
+            "    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;",
+            "    position: sticky !important;",
+            "    top: 0 !important;",
+            "    z-index: 10 !important;",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    justify-content: space-between !important;",
+            "    padding: 12px 20px !important;",
+            "    gap: 12px !important;",
+            "}",
+            ".douyux-dossier-toolbar-left {",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    gap: 12px !important;",
+            "}",
+            ".douyux-dossier-back-btn {",
+            "    background: rgba(255, 136, 0, 0.15) !important;",
+            "    border: 1px solid rgba(255, 136, 0, 0.45) !important;",
+            "    color: #FF8800 !important;",
+            "    border-radius: 8px !important;",
+            "    padding: 6px 14px !important;",
+            "    font-size: 13px !important;",
+            "    font-weight: 700 !important;",
+            "    cursor: pointer !important;",
+            "    display: inline-flex !important;",
+            "    align-items: center !important;",
+            "    gap: 4px !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-back-btn:hover {",
+            "    background: rgba(255, 136, 0, 0.28) !important;",
+            "    color: #FFAA33 !important;",
+            "    transform: translateX(-2px) !important;",
+            "}",
+            ".douyux-dossier-title {",
+            "    color: #F8FAFC !important;",
+            "    font-weight: 700 !important;",
+            "    font-size: 15px !important;",
+            "}",
+            ".douyux-dossier-actions {",
+            "    display: flex !important;",
+            "    align-items: center !important;",
+            "    gap: 10px !important;",
+            "}",
+            ".douyux-dossier-ext-link {",
+            "    color: #94A3B8 !important;",
+            "    font-size: 12px !important;",
+            "    text-decoration: none !important;",
+            "    display: inline-flex !important;",
+            "    align-items: center !important;",
+            "    gap: 4px !important;",
+            "    padding: 6px 12px !important;",
+            "    border-radius: 6px !important;",
+            "    background: rgba(255, 255, 255, 0.05) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.1) !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-ext-link:hover {",
+            "    color: #FF8800 !important;",
+            "    border-color: rgba(255, 136, 0, 0.4) !important;",
+            "    background: rgba(255, 136, 0, 0.1) !important;",
+            "}",
+            ".douyux-dossier-close-btn {",
+            "    background: rgba(255, 255, 255, 0.08) !important;",
+            "    border: 1px solid rgba(255, 255, 255, 0.15) !important;",
+            "    color: #CBD5E1 !important;",
+            "    border-radius: 50% !important;",
+            "    width: 32px !important;",
+            "    height: 32px !important;",
+            "    display: grid !important;",
+            "    place-items: center !important;",
+            "    font-size: 18px !important;",
+            "    cursor: pointer !important;",
+            "    line-height: 1 !important;",
+            "    transition: all 0.2s ease !important;",
+            "}",
+            ".douyux-dossier-close-btn:hover {",
+            "    background: rgba(239, 68, 68, 0.2) !important;",
+            "    border-color: rgba(239, 68, 68, 0.5) !important;",
+            "    color: #EF4444 !important;",
+            "}",
+            ".douyux-dossier-body {",
+            "    padding: 20px !important;",
+            "    min-height: 240px !important;",
+            "}",
+            ".douyux-dossier-loading {",
+            "    display: flex !important;",
+            "    flex-direction: column !important;",
+            "    align-items: center !important;",
+            "    justify-content: center !important;",
+            "    gap: 14px !important;",
+            "    padding: 70px 0 !important;",
+            "    color: #D7B875 !important;",
+            "    font-size: 14px !important;",
+            "}",
+            ".douyux-dossier-spinner {",
+            "    width: 38px !important;",
+            "    height: 38px !important;",
+            "    border: 3px solid rgba(215, 184, 117, 0.2) !important;",
+            "    border-top-color: #D7B875 !important;",
+            "    border-radius: 50% !important;",
+            "    animation: ex-spin 0.8s linear infinite !important;",
+            "}",
             "/* 彻底屏蔽快览弹窗（dialog / profile-preview-dialog），杜绝任何简略快览弹窗产生 */",
             "dialog,",
             "dialog.profile-preview-dialog,",
@@ -402,6 +551,10 @@ function initRouter_Xinlvjiang() {
             "[data-profile-dialog]::backdrop {",
             "    display: none !important;",
             "    background: transparent !important;",
+            "}",
+            "@keyframes ex-spin {",
+            "    0% { transform: rotate(0deg); }",
+            "    100% { transform: rotate(360deg); }",
             "}"
         ].join("\n");
         (document.head || document.documentElement).appendChild(style);
@@ -468,51 +621,161 @@ function initRouter_Xinlvjiang() {
         if (interactionsBound) return;
         interactionsBound = true;
 
-        function safeNavigate(url) {
-            if (!url) return;
-            url = String(url).replace(/&amp;/g, "&");
-            var absoluteUrl = url;
+        var overlay = null;
+        var dossierCache = new Map();
+
+        function ensureDossierModal() {
+            if (overlay && overlay.isConnected) return overlay;
+            overlay = document.createElement("div");
+            overlay.className = "douyux-dossier-overlay";
+            overlay.innerHTML = [
+                '<div class="douyux-dossier-backdrop"></div>',
+                '<div class="douyux-dossier-dialog" role="dialog" aria-modal="true" aria-label="选手详细资料">',
+                '  <header class="douyux-dossier-toolbar">',
+                '    <div class="douyux-dossier-toolbar-left">',
+                '      <button type="button" class="douyux-dossier-back-btn">← 返回</button>',
+                '      <span class="douyux-dossier-title">选手详细资料</span>',
+                '    </div>',
+                '    <div class="douyux-dossier-actions">',
+                '      <a class="douyux-dossier-ext-link" href="#" target="_blank" rel="noopener noreferrer" title="在官网新标签页中打开完整资料">在新标签页打开 ↗</a>',
+                '      <button type="button" class="douyux-dossier-close-btn" aria-label="关闭详细资料">×</button>',
+                '    </div>',
+                '  </header>',
+                '  <div class="douyux-dossier-body"></div>',
+                '</div>'
+            ].join("");
+
+            (document.body || document.documentElement).appendChild(overlay);
+
+            var closeBtn = overlay.querySelector(".douyux-dossier-close-btn");
+            var backBtn = overlay.querySelector(".douyux-dossier-back-btn");
+            var backdrop = overlay.querySelector(".douyux-dossier-backdrop");
+
+            function close() {
+                if (overlay) overlay.classList.remove("is-active");
+            }
+
+            if (closeBtn) closeBtn.addEventListener("click", close);
+            if (backBtn) backBtn.addEventListener("click", close);
+            if (backdrop) backdrop.addEventListener("click", close);
+
+            document.addEventListener("keydown", function (e) {
+                if ((e.key === "Escape" || e.keyCode === 27) && overlay && overlay.classList.contains("is-active")) {
+                    close();
+                }
+            });
+
+            return overlay;
+        }
+
+        function renderDossierHtml(container, html) {
+            if (!container) return;
+            var content = html;
+            if (html.indexOf("class=\"player-dossier") !== -1 || html.indexOf("id=\"main\"") !== -1) {
+                try {
+                    var temp = document.createElement("div");
+                    temp.innerHTML = html;
+                    var dossierEl = temp.querySelector(".player-dossier, #main");
+                    if (dossierEl) {
+                        content = dossierEl.outerHTML;
+                    }
+                } catch (_) {}
+            }
+            container.innerHTML = content;
             try {
-                absoluteUrl = new URL(url, window.location.origin).href;
-            } catch (_) {}
-            try {
-                if (document.body) {
-                    document.body.style.opacity = "0.75";
-                    document.body.style.transition = "opacity 0.15s ease";
+                if (globalThis.LvjiangPlayerProfiles && typeof globalThis.LvjiangPlayerProfiles.mount === "function") {
+                    globalThis.LvjiangPlayerProfiles.mount(container);
+                } else if (typeof mountDossier === "function") {
+                    mountDossier(container);
                 }
             } catch (_) {}
+            setTimeout(function () {
+                try {
+                    if (globalThis.LvjiangPlayerProfiles && typeof globalThis.LvjiangPlayerProfiles.mount === "function") {
+                        globalThis.LvjiangPlayerProfiles.mount(container);
+                    }
+                } catch (_) {}
+            }, 100);
+        }
 
-            // 1. 创建合成 <a> 标签并以 target="_self" 原生点击直达，穿透任何代理沙箱
-            try {
-                var a = document.createElement("a");
-                a.href = absoluteUrl;
-                a.target = "_self";
-                a.rel = "noopener noreferrer";
-                a.setAttribute("data-douyux-nav", "1");
-                a.style.display = "none";
-                (document.body || document.documentElement).appendChild(a);
-                a.click();
-                setTimeout(function () {
-                    try { a.remove(); } catch (_) {}
-                }, 300);
-            } catch (_) {}
+        function openPlayerDossier(entrantId, playerName) {
+            if (!entrantId) return;
+            var modal = ensureDossierModal();
+            var titleEl = modal.querySelector(".douyux-dossier-title");
+            var extLink = modal.querySelector(".douyux-dossier-ext-link");
+            var bodyEl = modal.querySelector(".douyux-dossier-body");
 
-            // 2. 标准 window.location.href 赋值
-            try {
-                window.location.href = absoluteUrl;
-            } catch (_) {}
+            var nameStr = (playerName || "").trim();
+            if (titleEl) {
+                titleEl.textContent = nameStr ? (nameStr + " · 选手详细资料") : "选手详细资料";
+            }
+            if (extLink) {
+                extLink.href = "https://xinlvjiang.icu/players/" + entrantId + "/?event=lvjiangbeiS3";
+            }
 
-            // 3. window.location.assign 兜底
-            try {
-                window.location.assign(absoluteUrl);
-            } catch (_) {}
+            modal.classList.add("is-active");
 
-            // 4. unsafeWindow 兜底
-            try {
-                if (typeof unsafeWindow !== "undefined" && unsafeWindow && unsafeWindow.location) {
-                    unsafeWindow.location.href = absoluteUrl;
+            if (dossierCache.has(entrantId)) {
+                renderDossierHtml(bodyEl, dossierCache.get(entrantId));
+                return;
+            }
+
+            bodyEl.innerHTML = [
+                '<div class="douyux-dossier-loading">',
+                '  <div class="douyux-dossier-spinner"></div>',
+                '  <span>正在回源同步【' + (nameStr || '选手') + '】官网全量详细数据...</span>',
+                '</div>'
+            ].join("");
+
+            var endpoint = "/previews/players/" + entrantId + "/?event=lvjiangbeiS3";
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", endpoint, true);
+            xhr.setRequestHeader("Accept", "text/html");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status >= 200 && xhr.status < 400 && xhr.responseText) {
+                        dossierCache.set(entrantId, xhr.responseText);
+                        renderDossierHtml(bodyEl, xhr.responseText);
+                    } else {
+                        var fallbackXhr = new XMLHttpRequest();
+                        fallbackXhr.open("GET", "/players/" + entrantId + "/?event=lvjiangbeiS3", true);
+                        fallbackXhr.setRequestHeader("Accept", "text/html");
+                        fallbackXhr.onreadystatechange = function () {
+                            if (fallbackXhr.readyState === 4) {
+                                if (fallbackXhr.status >= 200 && fallbackXhr.status < 400 && fallbackXhr.responseText) {
+                                    dossierCache.set(entrantId, fallbackXhr.responseText);
+                                    renderDossierHtml(bodyEl, fallbackXhr.responseText);
+                                } else {
+                                    bodyEl.innerHTML = [
+                                        '<div style="text-align:center;padding:50px 20px;color:#CBD5E1;">',
+                                        '  <p style="font-size:15px;margin-bottom:16px;">获取详细资料失败，您可以直接在官网打开完整页面查看：</p>',
+                                        '  <a class="button primary" href="https://xinlvjiang.icu/players/' + entrantId + '/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" style="color:#FF8800;font-weight:700;">直达选手官方资料页 ↗</a>',
+                                        '</div>'
+                                    ].join("");
+                                }
+                            }
+                        };
+                        fallbackXhr.onerror = function () {
+                            bodyEl.innerHTML = [
+                                '<div style="text-align:center;padding:50px 20px;color:#CBD5E1;">',
+                                '  <p style="font-size:15px;margin-bottom:16px;">网络异常，您可以直接在官网打开完整页面查看：</p>',
+                                '  <a class="button primary" href="https://xinlvjiang.icu/players/' + entrantId + '/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" style="color:#FF8800;font-weight:700;">直达选手官方资料页 ↗</a>',
+                                '</div>'
+                            ].join("");
+                        };
+                        fallbackXhr.send();
+                    }
                 }
-            } catch (_) {}
+            };
+            xhr.onerror = function () {
+                bodyEl.innerHTML = [
+                    '<div style="text-align:center;padding:50px 20px;color:#CBD5E1;">',
+                    '  <p style="font-size:15px;margin-bottom:16px;">网络异常，您可以直接在官网打开完整页面查看：</p>',
+                    '  <a class="button primary" href="https://xinlvjiang.icu/players/' + entrantId + '/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" style="color:#FF8800;font-weight:700;">直达选手官方资料页 ↗</a>',
+                    '</div>'
+                ].join("");
+            };
+            xhr.send();
         }
 
         function extractEntrantId(card) {
@@ -540,52 +803,44 @@ function initRouter_Xinlvjiang() {
             return "";
         }
 
-        function extractTargetUrl(card) {
+        function extractPlayerName(card) {
             if (!card) return "";
-
-            // 0. 若卡片本身即为 <a> 标签且指向选手
-            if (card.tagName === "A" && card.href) {
-                var href0 = card.href || card.getAttribute("href") || "";
-                if (href0 && (href0.indexOf("/players/") !== -1 || href0.indexOf("/previews/players/") !== -1)) {
-                    return href0.replace(/\/previews\/players\//, "/players/").replace(/&amp;/g, "&");
-                }
-            }
-
-            // 1. 若卡片处于外部 <a> 链接内
-            var parentLink = card.closest ? card.closest("a[href*='/players/'], a.player-card-link") : null;
-            if (parentLink) {
-                var hrefP = parentLink.href || parentLink.getAttribute("href") || "";
-                if (hrefP && (hrefP.indexOf("/players/") !== -1 || hrefP.indexOf("/previews/players/") !== -1)) {
-                    return hrefP.replace(/\/previews\/players\//, "/players/").replace(/&amp;/g, "&");
-                }
-            }
-
-            // 2. 优先直接获取卡片内部的选手资料链接（DOM属性 link.href 天然解码 HTML 实体）
-            var link = card.querySelector("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']");
-            var href = link ? (link.href || link.getAttribute("href") || "") : "";
-            if (href && (href.indexOf("/players/") !== -1 || href.indexOf("/previews/players/") !== -1)) {
-                return href.replace(/\/previews\/players\//, "/players/").replace(/&amp;/g, "&");
-            }
-
-            // 3. 从 data 属性中解析 entrantId
-            var entrantId = extractEntrantId(card);
-            if (entrantId) {
-                var currentReturn = encodeURIComponent(window.location.pathname + window.location.search);
-                return "/players/" + entrantId + "/?event=lvjiangbeiS3&return_to=" + currentReturn;
+            var nameEl = card.querySelector(".player-name-line h3, h3, .player-name, [title]");
+            if (nameEl) {
+                return nameEl.getAttribute("title") || nameEl.textContent || "";
             }
             return "";
         }
 
-        // 委托点击事件：拦截卡片与返回链接，平滑直达选手官方详情页
+        function ensureReturnBar() {
+            if (document.querySelector(".profile-return-row")) return;
+            var container = document.querySelector("#main, .player-dossier, .site-main");
+            if (!container) return;
+
+            var returnUrl = "";
+            try {
+                var sp = new URLSearchParams(window.location.search);
+                returnUrl = sp.get("return_to") || "";
+            } catch (_) {}
+            if (!returnUrl) {
+                returnUrl = "/teams/?event=lvjiangbeiS3";
+            }
+
+            var row = document.createElement("div");
+            row.className = "profile-return-row";
+            row.innerHTML = '<a class="back-link" href="' + returnUrl + '">← 返回（阵容 / 选手列表）</a>';
+            container.insertBefore(row, container.firstChild);
+        }
+
+        if (window.location.pathname.indexOf("/players/") !== -1 || document.querySelector(".player-dossier")) {
+            ensureReturnBar();
+        }
+
+        // 委托点击事件：拦截卡片与返回链接，弹出专属暗黑金边浮层，零白闪 + 100% 官方六维数据呈现
         function handleDelegateClick(e) {
             if (!e.target) return;
 
-            // 0. 我们自己触发的合成导航链接直接放行，执行原生跳转
-            if (e.target && e.target.getAttribute && e.target.getAttribute("data-douyux-nav")) {
-                return;
-            }
-
-            // ① 直播间外链放行
+            // ① 直播间外链放行，供用户在新标签页打开主播房间
             if (e.target.closest && e.target.closest(".card-room-entry, .profile-live-link")) {
                 return;
             }
@@ -595,26 +850,7 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ③ 选手详情页中的返回链接（← 返回选手 / ← 返回阵容）平滑回退
-            var backBtn = e.target.closest && e.target.closest(".back-link, .profile-return-row a");
-            if (backBtn) {
-                var backTarget = backBtn.href || backBtn.getAttribute("href");
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-                if (backTarget) {
-                    safeNavigate(backTarget);
-                } else {
-                    if (window.history && window.history.length > 1) {
-                        window.history.back();
-                    } else {
-                        safeNavigate("/?event=lvjiangbeiS3");
-                    }
-                }
-                return;
-            }
-
-            // ④ 处于选手卡片区域内的点击（覆盖各类类名与属性）
+            // ③ 处于选手卡片区域内的点击（覆盖各类类名与属性）
             var card = e.target.closest && e.target.closest(".player-card, .catalog-player-card, [data-entrant-card], [data-player-id], a[href*='/players/'], a.player-card-link");
             if (!card) return;
 
@@ -623,19 +859,20 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // 当前已在选手独立资料页（.player-dossier）内时，左侧自身卡片无需重复跳转
-            if (document.querySelector(".player-dossier") && card.closest(".dossier-identity")) {
+            // 当前已在选手资料页或浮层内，且点击的是左侧选手自身主卡片（.dossier-identity）时，无需重复弹出自身
+            if (card.closest && card.closest(".dossier-identity")) {
                 return;
             }
 
-            var destUrl = extractTargetUrl(card);
-            if (destUrl) {
+            var entrantId = extractEntrantId(card);
+            if (entrantId) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (typeof e.stopImmediatePropagation === "function") {
                     e.stopImmediatePropagation();
                 }
-                safeNavigate(destUrl);
+                var pName = extractPlayerName(card);
+                openPlayerDossier(entrantId, pName);
             }
         }
 
