@@ -1,0 +1,126 @@
+function initPkg_ExpandTool_ClearBag() {
+    ExpandTool_ClearBag_insertDom();
+    initPkg_ExpandTool_ClearBag_Set();
+    ExpandTool_ClearBag_insertFunc();
+}
+
+function initPkg_ExpandTool_ClearBag_Set() {
+    let ret = localStorage.getItem("ExSave_ClearBag");
+    if (ret != null) {
+        try {
+            let data = JSON.parse(ret);
+            if (data.id) {
+                let idEl = document.getElementById("extool__clearbag_id");
+                if (idEl) idEl.value = data.id;
+            }
+            if (data.name) {
+                let nameEl = document.getElementById("extool__clearbag_name") || document.getElementById("extool__clearbag_selected_name");
+                if (nameEl) nameEl.textContent = data.name;
+            }
+            if (data.icon) {
+                let iconEl = document.getElementById("extool__clearbag_icon");
+                if (iconEl) iconEl.src = data.icon;
+            }
+            if (data.count) {
+                let cntEl = document.getElementById("extool__clearbag_cnt");
+                if (cntEl) cntEl.value = data.count;
+            }
+        } catch(e) {}
+    }
+}
+
+function saveData_ExpandTool_ClearBag() {
+    let id = document.getElementById("extool__clearbag_id")?.value || "268";
+    let name = document.getElementById("extool__clearbag_name")?.textContent || document.getElementById("extool__clearbag_selected_name")?.textContent || "荧光棒";
+    let icon = document.getElementById("extool__clearbag_icon")?.src || "";
+    let count = document.getElementById("extool__clearbag_cnt")?.value || "1";
+    let data = { id, name, icon, count };
+    localStorage.setItem("ExSave_ClearBag", JSON.stringify(data));
+}
+
+function ExpandTool_ClearBag_insertDom() {
+    if (document.getElementById("extool__clearbag_id")) return;
+    let html = "";
+    html += '<label>背包送礼：</label><button type="button" id="extool__clearbag_picker_btn" style="border:1px solid #007aff;color:#007aff;background:#fff;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;margin-left:4px;">选择道具</button><br />';
+    html += '<label>礼物ID：</label><input id="extool__clearbag_id" type="text" style="width:55px;text-align:center;margin-right:6px;" value="268" />';
+    html += '<span id="extool__clearbag_selected_name" style="color:#007aff;font-size:12px;margin-right:8px;">(荧光棒)</span>';
+    html += '<label>数量：</label><input id="extool__clearbag_cnt" type="text" style="width:36px;text-align:center;" value="1" />';
+    html += '<input style="margin-left:10px;" type="button" id="extool__clearbag_sendbtn" value="送出" />';
+    let a = document.createElement("div");
+    a.className = "extool__clearbag";
+    a.innerHTML = html;
+    let b = document.getElementsByClassName("extool")[0];
+    b.insertBefore(a, b.childNodes[0]);
+}
+
+function ExpandTool_ClearBag_insertFunc() {
+    let pickerTrigger = document.getElementById("extool__clearbag_badge") || document.getElementById("extool__clearbag_picker_btn");
+    if (pickerTrigger) {
+        pickerTrigger.addEventListener("click", () => {
+            if (typeof openGiftPicker === "function") {
+                openGiftPicker("backpack", (gift) => {
+                    let idEl = document.getElementById("extool__clearbag_id");
+                    if (idEl) idEl.value = gift.id;
+                    let nameEl = document.getElementById("extool__clearbag_name") || document.getElementById("extool__clearbag_selected_name");
+                    if (nameEl) nameEl.textContent = gift.name;
+                    let iconEl = document.getElementById("extool__clearbag_icon");
+                    if (iconEl && gift.icon) iconEl.src = gift.icon;
+                    if (gift.count) {
+                        let cntEl = document.getElementById("extool__clearbag_cnt");
+                        if (cntEl) cntEl.value = gift.count;
+                    }
+                    saveData_ExpandTool_ClearBag();
+                });
+            }
+        });
+    }
+
+    let cntInput = document.getElementById("extool__clearbag_cnt");
+    if (cntInput) {
+        cntInput.addEventListener("input", saveData_ExpandTool_ClearBag);
+        cntInput.addEventListener("change", saveData_ExpandTool_ClearBag);
+    }
+
+    let sendBtn = document.getElementById("extool__clearbag_sendbtn");
+    if (sendBtn) {
+        sendBtn.addEventListener("click", async function() {
+            if (confirm("确认送出？") != true) {
+                return;
+            }
+            let id = document.getElementById("extool__clearbag_id").value;
+            let n = Number(document.getElementById("extool__clearbag_cnt").value);
+            showMessage("【背包送礼】执行中...", "info");
+            for (let i = 0; i < n; i++) {
+                await sleep(100).then(() => {
+                    sendGift_bag(id, 1, rid).then(data => {
+                        if (data.msg != "success") {
+                            showMessage("【背包送礼】" + rid + "赠送失败 " + data.msg, "error");
+                            console.log(rid, data);
+                        }
+                    }).catch(err => {
+                        showMessage("【背包送礼】" + rid + "赠送失败", "error");
+                        console.log(rid, err);
+                    })
+                })
+
+            }
+            showMessage("【背包送礼】执行完毕！", "success");
+        });
+    }
+}
+
+function getBagGifts(room_id, callback) {
+    // 获取背包内所有礼物信息(json)，传给回调函数
+    fetch('https://www.douyu.com/japi/prop/backpack/web/v5?rid=' + room_id, {
+        method: 'GET',
+        mode: 'no-cors',
+        credentials: 'include',
+        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    }).then(result => {
+        return result.json();
+    }).then(ret => {
+        callback(ret);
+    }).catch(err => {
+        console.log("请求失败!", err)
+    })
+}

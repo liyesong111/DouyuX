@@ -1,0 +1,107 @@
+#ex-accountList-wrap {
+    left: -152px;
+    top: -16px;
+    /* max-height: 330px;
+    overflow-y: scroll;
+    scrollbar-width: none;
+    -ms-overflow-style: none; */
+    -webkit-transition: all .2s cubic-bezier(.22,.58,.12,.98);
+    -o-transition: all cubic-bezier(.22,.58,.12,.98) .2s;
+    -moz-transition: all cubic-bezier(.22,.58,.12,.98) .2s;
+    transition: all .2s cubic-bezier(.22,.58,.12,.98);
+    -webkit-transform-origin: 80% 0;
+    -moz-transform-origin: 80% 0;
+    -ms-transform-origin: 80% 0;
+    -o-transform-origin: 80% 0;
+    transform-origin: 80% 0;
+    -webkit-animation: scale-in-ease .5s cubic-bezier(.22,.58,.12,.98);
+    -moz-animation: scale-in-ease cubic-bezier(.22,.58,.12,.98) .5s;
+    -o-animation: scale-in-ease cubic-bezier(.22,.58,.12,.98) .5s;
+    animation: scale-in-ease .5s cubic-bezier(.22,.58,.12,.98);
+}
+
+/* #ex-accountList-wrap::-webkit-scrollbar {
+    display: none;
+} */
+
+.ex-accountList-item {
+    padding: 10px;
+    display: flex;
+    border-radius: 8px;
+    align-items: center;
+    transition: background-color 0.2s ease;
+}
+.ex-accountList-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+#ex-accountList-iframe {
+    display: none;
+}
+#ex-accountList-iframe2 {
+    display: none;
+}
+
+#ex-accountList-item-add {
+    padding: 10px;
+    text-align: center;
+    margin-bottom: 0px;
+    border-radius: 8px;
+    color: #8E8E93;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#ex-accountList-item-add:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #F5F5F7;
+}
+
+.ex-accountList-item__imgWrap {
+    flex: 0 0 25%;
+}
+
+.ex-accountList-item__img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+}
+
+.ex-accountList-item__name {
+    line-height: 50px;
+    flex: 0 0 55%;
+    color: #F5F5F7;
+}
+
+.ex-accountList-item__btn {
+    height: 30px;
+    width: 50px;
+    border-radius: 8px;
+    align-items: center;
+    flex: auto;
+    text-align: center;
+    line-height: 28px;
+    color: #F5F5F7;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.ex-accountList-item__btn:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+#ex-accountList-icon:hover > #ex-accountList-wrap {
+    display: block;
+}
+
+#ex-accountList-content {
+    background: rgba(20, 20, 24, 0.82) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45) !important;
+    border-radius: 10px !important;
+    color: #F5F5F7 !important;
+}

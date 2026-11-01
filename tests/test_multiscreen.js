@@ -1,0 +1,1597 @@
+/*
+ * 多屏复刻的确定性测试。
+ * 重点覆盖两块"人工很难发现、但一错就手感全废"的逻辑：
+ *   1. 落点判定（4 套布局的死区与分区，全部按百分比边界逐个验证）
+ *   2. 拖拽换位后「数据 / 播放器记录 / DOM 类名」三者必须一致（错一个就会重启流）
+ *
+ * 约定：槽 0 是主画面格（.layout-Player-videoEntity，斗鱼自己的播放器所在格），
+ *       槽 1~4 的类名是 is-multi2 ~ is-multi5（类名数字 = 槽号 + 1）。
+ *       主房间会自动占据列表首位，所以"N 个格"需要请求 N-1 个额外房间。
+ */
+const fs = require("fs");
+const path = require("path");
+const assert = require("assert");
+let JSDOM;
+try {
+  JSDOM = require("jsdom").JSDOM;
+} catch (e) {
+  JSDOM = require("D:/harness/_cdp/node_modules/jsdom").JSDOM;
+}
+
+const RID = "9999";
+const RECT = { left: 0, top: 0, width: 800, height: 450, right: 800, bottom: 450 };
+
+/* 夹具页（douyu.com/9999 里那几段内联脚本）自己会挂异步定时器/回包，某些回包在缺节点时会抛
+   TypeError。它们与断言无关，但作为"未处理的 Promise 拒绝"会把整个进程带走，表现为"测试随机红"。
+   这里只吞掉**来自夹具页**的这类错误；断言失败（同步抛出、由 run().catch 打印）照旧中断。 */
+function isFixtureNoise(err) {
+  return /www\.douyu\.com\/9999/.test(String((err && err.stack) || err));
+}
+process.on("unhandledRejection", (err) => {
+  if (isFixtureNoise(err)) return;
+  throw err;
+});
+/* 同一批夹具回调也可能以"同步未捕获异常"的形式冒出来（MutationObserver 回调里读已销毁节点的父级）。
+   出现在断言全部结束之后，属于收尾噪声；同样只吞夹具来源的，其它异常照旧终止。 */
+process.on("uncaughtException", (err) => {
+  if (isFixtureNoise(err)) {
+    console.warn("[test] 忽略夹具页收尾噪声：" + String((err && err.message) || err).slice(0, 80));
+    return;
+  }
+  console.error(err);
+  process.exit(1);
+});
+
+function bundlePath() {
+  const px = path.join(__dirname, "../DouyuX.user.js");
+  if (fs.existsSync(px)) return px;
+  const p = path.join(__dirname, "../dist/douyuex.user.js");
+  if (fs.existsSync(p)) return p;
+  return path.join(__dirname, "../dist/DouyuX.user.js");
+}
+
+/* 自检钩子：产物是"上一次 build"的，源码改了它不会自己变。改完源码、Lead 重建之前，
+   可以用内存拼装出来的产物跑本文件（只在设了 global.__EX_MS_BUNDLE__ 时才走它）。
+   否则一律读真实产物 —— 常规运行（node tests/test_multiscreen.js / npm test）行为不变。 */
+function bundleText() {
+  if (typeof global.__EX_MS_BUNDLE__ === "string") return global.__EX_MS_BUNDLE__;
+  return fs.readFileSync(bundlePath(), "utf8");
+}
+
+// 复刻真实页面结构（实机核对过 2288 房间）：
+//   容器 → .player__6-Nuo(已定位) → #js-player-video → #js-player-video-case
+//   而 #__h5player 与容器**同尺寸同位置却是另一棵树、并不包含容器**（旧播放器）
+// 这个结构差异曾经让我把事件错挂到 #__h5player 上导致拖拽整体失效，所以宿主 DOM 必须如实复刻。
+function makeDom() {
+  return new JSDOM(
+    `<!DOCTYPE html><html><head><!-- $ROOM.room_id = ${RID}; --></head><body>
+      <div id="js-player-video-case">
+        <div id="js-player-video">
+          <div class="player__6-Nuo" style="position:relative">
+            <div id="js-player-multiContainer" class="layout-Player-multiContainer">
+              <div class="layout-Player-videoEntity"><video id="realVideo"></video></div>
+              <div class="layout-Player-multiPlayer is-multi2"></div>
+              <div class="layout-Player-multiPlayer is-multi3"></div>
+              <div class="layout-Player-multiPlayer is-multi4"></div>
+              <div class="layout-Player-multiPlayer is-multi5"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="__h5player"></div>
+      <ul id="js-barrage-list" class="Barrage-list"></ul>
+    </body></html>`,
+    { url: "https://www.douyu.com/" + RID, runScripts: "dangerously" }
+  );
+}
+
+function load(dom) {
+  const win = dom.window;
+  win.URL.createObjectURL = () => "blob:mock";
+  win.URL.revokeObjectURL = () => {};
+  win.unsafeWindow = win;
+  win.rid = RID;
+  win.__notices = [];
+  win.fetch = async () => ({ json: async () => ({}) });
+  // 取流与元数据一律不返回，让格子稳定停在 loading 态（测试只关心结构与判定）
+  win.GM_xmlhttpRequest = () => {};
+  win.GM_getValue = () => null;
+  win.GM_setValue = () => {};
+  win.GM_setClipboard = () => {};
+  win.GM_registerMenuCommand = () => {};
+  const script = win.document.createElement("script");
+  script.textContent = bundleText();
+  win.document.body.appendChild(script);
+  // 通知桩必须在产物加载之后替换：产物自带的 NoticeJs 库会在加载时覆盖全局的预置桩
+  win.__notices = [];
+  win.NoticeJs = function (opt) {
+    win.__notices.push(opt && opt.text);
+    return { show() {} };
+  };
+  // 真实链路里这两个由 initRouter 拉起；宿主初始化在缺 GM_* 时会中断，
+  // 所以这里显式初始化，让测试只针对多屏本身
+  win.initPkg_PopupPlayer_MultiScreen();
+  // 样式同样由 initRouter 注入，缺了它 getComputedStyle 解析不到多屏这一节的规则
+  win.initStyles();
+  assert.strictEqual(String(win.rid), RID, "宿主必须从页面标记解析出全局 rid，否则所有房间判定都会错");
+  return win;
+}
+
+// 从注入的样式表里按选择器取规则
+function cssRules(win, match) {
+  const out = [];
+  Array.from(win.document.styleSheets).forEach((sheet) => {
+    let rules;
+    try {
+      rules = sheet.cssRules;
+    } catch (e) {
+      return;
+    }
+    Array.from(rules || []).forEach((r) => {
+      if (r.selectorText && match(r.selectorText)) out.push(r);
+    });
+  });
+  return out;
+}
+
+// 取某条声明在规则集里的最终值（后出现的规则胜出，与浏览器层叠一致）
+function cssValue(rules, prop) {
+  let v = "";
+  rules.forEach((r) => {
+    const x = r.style.getPropertyValue(prop);
+    if (x) v = x.trim();
+  });
+  return v;
+}
+
+// CSSOM 会规范化取值（#333 → rgb(51, 51, 51)、0 0 0 16px → 0px 0px 0px 16px），
+// 断言前把两边都过一遍同样的规范化，避免拿"写法差异"当失败
+function normVal(v) {
+  if (v == null) return v;
+  let s = String(v).trim().toLowerCase();
+  s = s.replace(/#([0-9a-f]{3}|[0-9a-f]{6})\b/g, (m, h) => {
+    const full = h.length === 3 ? h[0] + h[0] + h[1] + h[1] + h[2] + h[2] : h;
+    const n = parseInt(full, 16);
+    return "rgb(" + ((n >> 16) & 255) + ", " + ((n >> 8) & 255) + ", " + (n & 255) + ")";
+  });
+  s = s.replace(/(^|\s)0(?=\s|$)/g, "$10px");
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function assertCss(rules, prop, want, label) {
+  const got = cssValue(rules, prop);
+  assert.strictEqual(normVal(got), normVal(want), `${label} 的 ${prop} 必须为 ${want}，实际 ${got}`);
+}
+
+// jsdom 不做布局，getBoundingClientRect 恒为 0，必须显式给容器装一个真实的矩形
+function stubRect(el, rect) {
+  el.getBoundingClientRect = () => Object.assign({ x: rect.left, y: rect.top }, rect);
+}
+
+// 按位置取格子（位置与类名身份解耦：换位只改位置归属，类名永不变）
+function cellPos(win, p) {
+  return win.MultiScreen_slots()[p] || null;
+}
+
+function slotOf(win, n) {
+  const c = win.document.getElementById("js-player-multiContainer");
+  return n === 0
+    ? c.querySelector(".layout-Player-videoEntity")
+    : c.querySelector(".layout-Player-multiPlayer.is-multi" + (n + 1));
+}
+
+// 进入"恰好 n 个格"的多屏（主房间自动占一格）
+function enterGrid(win, n) {
+  const extra = [];
+  for (let i = 1; i < n; i++) extra.push({ rid: String(1000 + i), nn: "房间" + i, avatar: "" });
+  win.MultiScreen_enter(extra.length ? extra : [{ rid: "1001" }]);
+  const list = win.MultiScreen_getList();
+  assert.strictEqual(list.length, n, `预期 ${n} 个格，实际 ${list.length}`);
+  assert.strictEqual(list[0].rid, RID, "主房间必须在列表首位");
+  return list;
+}
+
+function hit(win, px, py, longPress) {
+  // 用容器矩形的相对比例推绝对坐标，测试里读起来更直观
+  return win.MultiScreen_hitTest(px * RECT.width, py * RECT.height, !!longPress);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function run() {
+  console.log("=== 多屏复刻单元测试 ===");
+  const dom = makeDom();
+  const win = load(dom);
+  stubRect(win.document.getElementById("js-player-multiContainer"), RECT);
+  const container = win.document.getElementById("js-player-multiContainer");
+
+  // ---------- 1. 宿主识别 ----------
+  console.log("--> 1. 宿主与槽位识别");
+  assert.strictEqual(win.MultiScreen_isSupported(), true, "五个槽位齐备时必须识别为受支持");
+  // 宿主必须是容器的已定位祖先；#__h5player 与容器同尺寸同位置却**不包含**容器，
+  // 一旦误挂到它上面，拖拽与点击会整体收不到事件（实机踩过）
+  const host = win.MultiScreen_getHost();
+  assert.ok(host && host.contains(container), "宿主必须包含多屏容器");
+  assert.notStrictEqual(host.id, "__h5player", "宿主绝不能是 #__h5player（它不包含容器）");
+  assert.strictEqual(host.className, "player__6-Nuo", "宿主必须是容器的第一个已定位祖先");
+
+  // ---------- 2. 布局与类名 ----------
+  console.log("--> 2. is-multiN 布局与 z 序");
+  enterGrid(win, 3);
+  assert.strictEqual(container.className, "layout-Player-multiContainer is-multi is-multi3", "3 分屏容器类名必须是 is-multi is-multi3");
+  const expect3 = [
+    { top: "17.2%", left: "0.8%", width: "65.6%", height: "65.6%", z: "5" },
+    { top: "17.2%", left: "66.4%", width: "32.8%", height: "32.8%", z: "4" },
+    { top: "50%", left: "66.4%", width: "32.8%", height: "32.8%", z: "3" },
+  ];
+  expect3.forEach((g, i) => {
+    const el = slotOf(win, i);
+    assert.strictEqual(el.style.top, g.top, `3 分屏槽 ${i} top 不符`);
+    assert.strictEqual(el.style.left, g.left, `3 分屏槽 ${i} left 不符`);
+    assert.strictEqual(el.style.width, g.width, `3 分屏槽 ${i} width 不符`);
+    assert.strictEqual(el.style.height, g.height, `3 分屏槽 ${i} height 不符`);
+    assert.strictEqual(el.style.zIndex, g.z, `3 分屏槽 ${i} z-index 不符`);
+  });
+  // 不在本次分屏内的槽位必须交回原生规则（清空内联，回到 scale(0)+hidden）
+  const idle = slotOf(win, 3);
+  // 失活位置必须**显式**清零隐藏：主画面格没有 is-multiN，原生规则不会隐藏它，
+  // 只清内联样式会让被换到多余位置上的格子一直摆在画面上
+  assert.strictEqual(idle.style.width, "0px", "失活位置必须清零宽度");
+  assert.strictEqual(idle.style.height, "0px", "失活位置必须清零高度");
+  assert.strictEqual(idle.style.visibility, "hidden", "失活位置必须隐藏");
+  assert.strictEqual(idle.style.transform, "scale(0)", "失活位置必须缩到不可见");
+
+  enterGrid(win, 2);
+  assert.strictEqual(container.className, "layout-Player-multiContainer is-multi is-multi2", "2 分屏容器类名错误");
+  assert.strictEqual(slotOf(win, 0).style.top, "25%", "2 分屏槽 0 top 错误");
+  assert.strictEqual(slotOf(win, 1).style.left, "50%", "2 分屏槽 1 left 错误");
+
+  enterGrid(win, 4);
+  assert.strictEqual(container.className, "layout-Player-multiContainer is-multi is-multi4", "4 分屏容器类名错误");
+  assert.strictEqual(slotOf(win, 3).style.top, "50%", "4 分屏槽 3 应在左下");
+  assert.strictEqual(slotOf(win, 3).style.left, "0%", "4 分屏槽 3 应在左下");
+
+  enterGrid(win, 5);
+  assert.strictEqual(container.className, "layout-Player-multiContainer is-multi is-multi5", "5 分屏容器类名错误");
+  assert.strictEqual(slotOf(win, 4).style.top, "66.2%", "5 分屏槽 4 top 错误");
+  assert.strictEqual(slotOf(win, 4).style.left, "58.1%", "5 分屏槽 4 left 错误");
+
+  // 外房必须一律静音：只有当前直播间的原生播放器出声
+  enterGrid(win, 3);
+  for (let i = 1; i < 3; i++) {
+    const v = slotOf(win, i).querySelector(".ms-slot__video");
+    assert.ok(v, "外房格必须有 video 节点");
+    assert.strictEqual(v.muted, true, "外房格 " + i + " 必须静音");
+    assert.strictEqual(v.volume, 0, "外房格 " + i + " 音量必须为 0");
+    assert.strictEqual(v.hasAttribute("muted"), true, "外房格 " + i + " 必须带 muted 属性（部分浏览器只认属性）");
+  }
+  // 单屏时必须退回普通容器（去掉 is-multi 与 is-multiN）
+  win.MultiScreen_exit();
+  assert.strictEqual(container.className, "layout-Player-multiContainer", "退出多屏后容器必须回到单屏类名");
+
+  // ---------- 3. 落点判定：2 分屏 ----------
+  console.log("--> 3. 落点判定与死区（2/3/4/5 分屏）");
+  enterGrid(win, 2);
+  assert.strictEqual(hit(win, 0.25, 0.5), 0, "2 分屏左侧应命中槽 0");
+  assert.strictEqual(hit(win, 0.75, 0.5), 1, "2 分屏右侧应命中槽 1");
+  assert.strictEqual(hit(win, 0.5, 0.2), -1, "2 分屏上带 25% 以内是死区");
+  assert.strictEqual(hit(win, 0.5, 0.8), -1, "2 分屏下带 75% 以外是死区");
+  assert.notStrictEqual(hit(win, 0.5, 0.25), -1, "2 分屏 p=0.25 恰好合法");
+  assert.notStrictEqual(hit(win, 0.5, 0.75), -1, "2 分屏 p=0.75 恰好合法");
+
+  // ---------- 4. 落点判定：3 分屏 ----------
+  enterGrid(win, 3);
+  assert.strictEqual(hit(win, 0.3, 0.5), 0, "3 分屏左侧大格应命中槽 0");
+  assert.strictEqual(hit(win, 0.5, 0.5), 0, "3 分屏 d<0.664 一律归槽 0");
+  assert.strictEqual(hit(win, 0.7, 0.3), 1, "3 分屏右上应命中槽 1");
+  assert.strictEqual(hit(win, 0.7, 0.6), 2, "3 分屏右下应命中槽 2");
+  assert.strictEqual(hit(win, 0.5, 0.15), -1, "3 分屏上带死区");
+  assert.strictEqual(hit(win, 0.5, 0.85), -1, "3 分屏下带死区");
+  assert.strictEqual(hit(win, 0.004, 0.5), -1, "3 分屏左边缘死区");
+  assert.strictEqual(hit(win, 0.996, 0.3), -1, "3 分屏右边缘死区");
+  assert.strictEqual(hit(win, 0.67, 0.3), 1, "3 分屏 d=0.67 应落到右列");
+  assert.strictEqual(hit(win, 0.66, 0.3), 0, "3 分屏 d=0.66 应仍在左列");
+
+  // ---------- 5. 落点判定：4 分屏（无死区） ----------
+  enterGrid(win, 4);
+  assert.strictEqual(hit(win, 0.25, 0.25), 0, "4 分屏左上 → 槽 0");
+  assert.strictEqual(hit(win, 0.75, 0.25), 1, "4 分屏右上 → 槽 1");
+  assert.strictEqual(hit(win, 0.75, 0.75), 2, "4 分屏右下 → 槽 2");
+  assert.strictEqual(hit(win, 0.25, 0.75), 3, "4 分屏左下 → 槽 3");
+  assert.strictEqual(hit(win, 0.995, 0.995), 2, "4 分屏无死区，极限右下仍须命中槽 2");
+
+  // ---------- 6. 落点判定：5 分屏 ----------
+  enterGrid(win, 5);
+  assert.strictEqual(hit(win, 0.3, 0.25), 0, "5 分屏左上大格 → 槽 0");
+  assert.strictEqual(hit(win, 0.3, 0.75), 3, "5 分屏左下大格 → 槽 3");
+  assert.strictEqual(hit(win, 0.7, 0.2), 1, "5 分屏右上 → 槽 1");
+  assert.strictEqual(hit(win, 0.7, 0.5), 2, "5 分屏右中 → 槽 2");
+  assert.strictEqual(hit(win, 0.7, 0.8), 4, "5 分屏右下 → 槽 4");
+  assert.strictEqual(hit(win, 0.5, 0.005), -1, "5 分屏上边缘死区");
+  assert.strictEqual(hit(win, 0.5, 0.99), -1, "5 分屏下边缘死区");
+  assert.strictEqual(hit(win, 0.05, 0.5), -1, "5 分屏左边缘死区");
+  assert.strictEqual(hit(win, 0.95, 0.3), -1, "5 分屏右边缘死区");
+
+  // ---------- 7. 底部控制条保护带（仅起手时生效） ----------
+  console.log("--> 7. 拖拽起手的底部控制条保护带（42px）");
+  enterGrid(win, 5);
+  const bottomY = (RECT.height - 20) / RECT.height; // 距底 20px，落在 42px 保护带内
+  assert.strictEqual(hit(win, 0.3, bottomY, true), -1, "起手落在底部 42px 内必须拒绝");
+  assert.notStrictEqual(hit(win, 0.3, bottomY, false), -1, "拖拽过程中不受保护带限制");
+  const safeY = (RECT.height - 60) / RECT.height; // 距底 60px，保护带之外
+  assert.notStrictEqual(hit(win, 0.3, safeY, true), -1, "保护带之外可以正常起手");
+
+  // ---------- 8. 列表归一化 ----------
+  console.log("--> 8. 列表归一化（主房间必在、去重、上限 5）");
+  let list = win.MultiScreen_enter([{ rid: "2001" }, { rid: "2002" }]);
+  assert.strictEqual(list[0].rid, RID, "开启多屏时主房间必须归槽 0");
+  assert.strictEqual(list.length, 3, "主房间应被自动补入");
+
+  list = win.MultiScreen_enter([{ rid: "1001" }, { rid: "1001" }, { rid: "1002" }]);
+  assert.strictEqual(list.length, 3, "重复 rid 必须去重（主房间 + 1001 + 1002）");
+
+  list = win.MultiScreen_enter([{ rid: "1001" }, { rid: "1002" }, { rid: "1003" }, { rid: "1004" }, { rid: "1005" }, { rid: "1006" }]);
+  assert.strictEqual(list.length, 5, "超过上限必须截断到 5");
+  assert.strictEqual(list[0].rid, RID, "截断后主房间仍在槽 0");
+  assert.strictEqual(list.filter((r) => String(r.rid) === "1005").length, 0, "溢出房间必须被丢弃");
+
+  // ---------- 9. 增删的上下限 ----------
+  console.log("--> 9. 添加/移除：上限 5；移除可一路到只剩主房间");
+  enterGrid(win, 2);
+  win.MultiScreen_removeRoom(String(1001));
+  /* 用户 2026-10-06 定：只剩「1 主房 + 1 外房」时，× 也必须能关掉外房 ——
+     关完只剩主房间就自然退回单屏，不需要先去点「退出多屏」。 */
+  assert.strictEqual(win.MultiScreen_getList().length, 1, "只剩 2 个时移除外房必须生效（实际 " + win.MultiScreen_getList().length + "）");
+  assert.strictEqual(String(win.MultiScreen_getList()[0].rid), RID, "剩下的必须是主房间");
+  assert.strictEqual(container.className, "layout-Player-multiContainer", "只剩主房间时必须退回单屏容器类名");
+  assert.strictEqual(hit(win, 0.25, 0.5, true), -1, "退回单屏后任何位置都不得判定为可拖拽");
+  enterGrid(win, 5);
+  win.MultiScreen_addRoom({ rid: "3001" });
+  assert.strictEqual(win.MultiScreen_getList().length, 5, "到达上限后不得再添加");
+  win.MultiScreen_addRoom({ rid: "3002" });
+  assert.strictEqual(win.MultiScreen_getList().length, 5, "上限必须硬生效");
+  assert.strictEqual(win.MultiScreen_getList().filter((r) => String(r.rid) === "3002").length, 0, "超限房间不得进入列表");
+
+  // ---------- 10. 加房 / 移除的规则与文案（原先寄生在编辑条里，现已并入面板） ----------
+  console.log("--> 10. 加房/移除规则与文案");
+  enterGrid(win, 3);
+  win.__notices.length = 0;
+  // 规则 1：主房间本来就在 → 静默返回，不给任何提示
+  assert.strictEqual(win.PopupPlayer_toggleRoom({ rid: RID, nn: "主房" }), false, "点主房间必须静默返回 false");
+  assert.strictEqual(win.__notices.length, 0, "点主房间不得弹任何提示：" + JSON.stringify(win.__notices));
+  // 规则 2：未开播不得加入
+  win.__notices.length = 0;
+  assert.strictEqual(win.PopupPlayer_toggleRoom({ rid: "8881", nn: "未开播的", showStatus: 2 }), false, "未开播的房间不得加入");
+  assert.ok(win.__notices.some((t) => t && t.indexOf("主播还没开播") !== -1), "必须提示主播还没开播（+ 让他上线再加），实际：" + JSON.stringify(win.__notices));
+  // 规则 3：已达上限不得加入
+  win.__notices.length = 0;
+  enterGrid(win, 5);
+  assert.strictEqual(win.PopupPlayer_toggleRoom({ rid: "3009", nn: "满员测试", showStatus: 1 }), false, "满 5 个后不得再加入");
+  assert.ok(win.__notices.some((t) => t && t.indexOf("同屏最多 5 个房间") !== -1), "必须提示同屏最多 5 个房间（先去掉一间再加），实际：" + JSON.stringify(win.__notices));
+  // 规则 4：在播且未满 → 允许加入
+  enterGrid(win, 4);
+  win.__notices.length = 0;
+  assert.strictEqual(win.PopupPlayer_toggleRoom({ rid: "3010", nn: "可加入", showStatus: 1 }), true, "在播且未满应允许加入");
+  assert.strictEqual(win.MultiScreen_getList().length, 5, "加入后列表应为 5");
+  assert.strictEqual(win.__notices.length, 0, "合法加入不得弹提示：" + JSON.stringify(win.__notices));
+  // 规则 5：已加入的再点一次 = 移出（不再有"最少 2 个"的门槛）
+  win.__notices.length = 0;
+  assert.strictEqual(win.PopupPlayer_toggleRoom({ rid: "3010", nn: "可加入", showStatus: 1 }), true, "已加入的房间再点一次必须移出");
+  assert.strictEqual(win.MultiScreen_getList().length, 4, "移出后列表应为 4");
+  assert.strictEqual(win.__notices.length, 0, "合法移出不得弹提示：" + JSON.stringify(win.__notices));
+
+  // ---------- 11. 拖拽换位：数据 / 播放器记录 / 类名三者一致 ----------
+  console.log("--> 11. 拖拽换位的一致性与流不中断");
+  enterGrid(win, 2);
+  const before = win.MultiScreen_getList().map((r) => String(r.rid));
+  // 2 分屏下 x=0.25 命中"格子 1"= 槽 0（主画面格，斗鱼自己的播放器所在格）
+  const cellA = slotOf(win, 0);
+  const cellB = slotOf(win, 1);
+  assert.strictEqual(cellA.className.indexOf("layout-Player-videoEntity"), 0, "槽 0 必须是主画面格");
+  // 起手格挂一个可识别的子节点，用来证明它没被 reparent
+  const markerA = win.document.createElement("div");
+  markerA.id = "markerA";
+  cellA.appendChild(markerA);
+
+  const md = new win.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  console.log("   [diag] container=" + container.className + " list=" + win.MultiScreen_getList().length +
+    " hit=" + win.MultiScreen_hitTest(0.25 * RECT.width, 0.5 * RECT.height, true) +
+    " hostOk=" + !!win.MultiScreen_getHost());
+  container.dispatchEvent(md);
+  await sleep(350); // 越过 300ms 长按阈值
+  console.log("   [diag] after sleep dragging=" + win.document.querySelectorAll(".dragging-player").length +
+    " placeholders=" + win.document.querySelectorAll(".ms-slot--placeholder").length +
+    " cellA=" + cellA.className);
+  assert.ok(cellA.classList.contains("dragging-player"), "长按后起手格必须进入拖拽态");
+  assert.ok(container.classList.contains("is-dragging"), "拖拽中容器必须带 is-dragging");
+  assert.ok(container.querySelector(".ms-slot--placeholder"), "拖拽中必须存在占位块");
+
+  const mm = new win.MouseEvent("mousemove", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(mm);
+  assert.ok(cellB.classList.contains("cur") && cellB.classList.contains("is-cur"), "落点格（槽 1）必须同时挂 cur 与 is-cur（原生只挂 is-cur，高亮失效）");
+
+  const mu = new win.MouseEvent("mouseup", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  win.document.dispatchEvent(mu);
+
+  const after = win.MultiScreen_getList().map((r) => String(r.rid));
+  assert.strictEqual(after[0], before[1], "换位后槽 0 应持有原来槽 1 的房间，实际 " + JSON.stringify(after));
+  assert.strictEqual(after[1], before[0], "换位后槽 1 应持有原来槽 0 的房间");
+  // 播放器节点绝不能搬家：标记节点必须还在原来那个 DOM 元素里
+  assert.ok(cellA.contains(markerA), "起手格的子节点不得被 reparent（搬 DOM 会重置 <video> 播放）");
+  // 换位**绝不能改类名**：容器里的节点是斗鱼 React 管理的，动它的类名会让 React 重渲染，
+  // 主房间播放器会在换位后加载出错（实机复现过）。位置由内联几何表达，类名保持原样。
+  assert.notStrictEqual(cellA.className.indexOf("layout-Player-videoEntity"), -1, "起手格必须保留自己的类名（不得改类名换位）");
+  assert.strictEqual(cellA.className.indexOf("is-multi2"), -1, "起手格不得被改成落点格的类名");
+  assert.notStrictEqual(cellB.className.indexOf("is-multi2"), -1, "落点格必须保留自己的类名");
+  assert.strictEqual(cellB.className.indexOf("layout-Player-videoEntity"), -1, "落点格不得被改成主画面格身份");
+  // 类名换了，位置也必须跟着换（内联样式要立刻重算，否则旧内联值会把元素钉在原处）
+  assert.strictEqual(cellA.style.left, "50%", "换位后起手格必须落在新格子的左坐标");
+  assert.strictEqual(cellB.style.left, "0%", "换位后落点格必须落在新格子的左坐标");
+  assert.strictEqual(cellA.style.transform, "scale(1)", "换位后必须恢复为正常缩放");
+  assert.strictEqual(cellA.classList.contains("dragging-player"), false, "换位后必须摘掉拖拽态");
+  assert.strictEqual(container.classList.contains("is-dragging"), false, "换位后容器必须摘掉 is-dragging");
+  assert.strictEqual(container.querySelector(".ms-slot--placeholder"), null, "换位后占位块必须被移除");
+  assert.strictEqual(cellB.classList.contains("cur"), false, "换位后落点高亮必须清除");
+
+  // ---------- 12. 死区松手必须取消，不得改动列表 ----------
+  console.log("--> 12. 落死区松手取消");
+  const snapshot = win.MultiScreen_getList().map((r) => String(r.rid));
+  const md2 = new win.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(md2);
+  await sleep(350);
+  const deadY = 0.02 * RECT.height; // 2 分屏下这是死区
+  const mm2 = new win.MouseEvent("mousemove", { button: 0, clientX: 0.25 * RECT.width, clientY: deadY, bubbles: true });
+  container.dispatchEvent(mm2);
+  const mu2 = new win.MouseEvent("mouseup", { button: 0, clientX: 0.25 * RECT.width, clientY: deadY, bubbles: true });
+  win.document.dispatchEvent(mu2);
+  assert.deepStrictEqual(win.MultiScreen_getList().map((r) => String(r.rid)), snapshot, "落死区松手后列表不得变化");
+  assert.strictEqual(container.querySelector(".ms-slot--placeholder"), null, "取消后占位块必须清掉");
+  assert.strictEqual(container.classList.contains("is-dragging"), false, "取消后必须摘掉 is-dragging");
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 0, "取消后不得残留 dragging-player");
+  assert.strictEqual(cellPos(win, 0).style.left, "0%", "取消后位置 0 必须回到原位");
+  assert.strictEqual(cellPos(win, 1).style.left, "50%", "取消后位置 1 必须保持原位");
+
+  // ---------- 13. 短按不得触发拖拽 ----------
+  console.log("--> 13. 短按不触发拖拽");
+  const md3 = new win.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(md3);
+  await sleep(100); // 不足 300ms
+  const mu3 = new win.MouseEvent("mouseup", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  win.document.dispatchEvent(mu3);
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 0, "短按不得进入拖拽态");
+  assert.strictEqual(container.querySelector(".ms-slot--placeholder"), null, "短按不得产生占位块");
+  await sleep(260);
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 0, "长按定时器必须被 mouseup 取消");
+
+  // ---------- 14.1 关键几何 1:1 保真（全部源自斗鱼样式表的实测原值） ----------
+  console.log("--> 14.1 格子关键几何保真");
+  const geo = [
+    {
+      name: "房名胶囊",
+      sel: (s) => s.indexOf(".ms-slot__name") !== -1 && s.indexOf("text") === -1 && s.indexOf("icon") === -1,
+      want: { bottom: "20px", left: "10px", "border-radius": "14px", "font-size": "14px" },
+    },
+    {
+      name: "房名头像",
+      sel: (s) => s.indexOf(".ms-slot__name-icon") !== -1,
+      want: { width: "20px", height: "20px" },
+    },
+    {
+      name: "房名文字",
+      sel: (s) => s.indexOf(".ms-slot__name-text") !== -1,
+      want: { "max-width": "120px" },
+    },
+    {
+      name: "重新加载按钮",
+      sel: (s) => s.indexOf(".ms-slot__reload") !== -1 && s.indexOf(":hover") === -1 && !/is-visible/.test(s),
+      want: { width: "86px", height: "34px", border: "2px solid #ff5d23", "border-radius": "8px", color: "#ff5d23" },
+    },
+    {
+      name: "占位块",
+      sel: (s) => s.indexOf(".ms-slot--placeholder") !== -1,
+      want: { border: "2px solid #fff", "pointer-events": "none", "background-color": "#333" },
+    },
+  ];
+  geo.forEach((g) => {
+    const rules = cssRules(win, g.sel);
+    assert.ok(rules.length > 0, `必须存在「${g.name}」的样式规则`);
+    Object.keys(g.want).forEach((prop) => {
+      assertCss(rules, prop, g.want[prop], `「${g.name}」`);
+    });
+  });
+  // 落点高亮必须同时覆盖 cur 与 is-cur（原生只挂 is-cur，样式表只有 .cur，高亮实际失效）
+  const curRules = cssRules(win, (s) => s.indexOf("is-cur") !== -1 && s.indexOf("layout-Player-multiPlayer") !== -1);
+  assert.ok(curRules.length > 0, "落点高亮必须同时接 cur 与 is-cur 两个类");
+  assertCss(curRules, "border", "2px solid #ff5d23", "落点高亮");
+  // 房名胶囊的字体大小必须小于弹幕/正文，不能盖过原生观感
+  assert.ok(
+    cssRules(win, (s) => s.indexOf(".ms-slot__name-text") !== -1 && s.indexOf("font-size") !== -1).length >= 0,
+    "房名文字规则必须存在"
+  );
+
+  // ---------- 15. 画质档位 ----------
+  console.log("--> 15. 画质档位");
+  assert.strictEqual(win.MultiScreen_getQuality(), "auto", "默认档位必须是「自动」（按格子尺寸选档，见场景 24）");
+  /* 用户 2026-10-06 让把编辑条整个删掉：档位 UI 只剩面板上的胶囊一处（面板断言在场景 27），
+     这里守住"编辑条真的没了"——模块、按钮、样式都必须一起清掉，不能留半截。 */
+  assert.strictEqual(typeof win.MS_EditBar_getQuality, "undefined", "编辑条的模块必须已经不存在");
+  assert.strictEqual(cssRules(win, (s) => s.indexOf(".ms-editbar") !== -1).length, 0, "编辑条的样式规则必须一并删干净");
+  win.MultiScreen_setQuality("3");
+  assert.strictEqual(win.MultiScreen_getQuality(), "3", "设置档位必须生效");
+
+  // ---------- 16. 存储键规范 ----------
+  console.log("--> 16. 存储键规范");
+  assert.ok(win.localStorage.getItem("ExSave_MultiScreen"), "ExSave_MultiScreen 必须写入 localStorage");
+  const saved = JSON.parse(win.localStorage.getItem("ExSave_MultiScreen"));
+  assert.ok(Array.isArray(saved.list) && saved.list.length >= 2, "持久化必须存下房间列表");
+  assert.strictEqual(saved.qn, "3", "持久化必须存下画质档位");
+
+  // ---------- 17. 单屏时不得误判为可拖拽 ----------
+  console.log("--> 17. 单屏保护");
+  win.MultiScreen_exit();
+  assert.strictEqual(win.MultiScreen_hitTest(0.3 * RECT.width, 0.5 * RECT.height, true), -1, "只有一个直播间时任何位置都不得判定为可拖拽");
+
+  // ---------- 18. 「最近看过」本地记录 ----------
+  console.log("--> 18. 最近看过");
+  enterGrid(win, 3);
+  const recent = win.MultiScreen_getRecent();
+  const recentRaw = JSON.parse(win.localStorage.getItem("ExSave_MultiScreenRecent"));
+  assert.ok(Array.isArray(recentRaw) && recentRaw.length >= 2, "进过多屏的房间必须写入最近看过");
+  recent.forEach((r) => {
+    assert.ok(
+      !win.MultiScreen_getList().some((x) => String(x.rid) === String(r.rid)),
+      "最近看过必须排除已在多屏里的房间"
+    );
+  });
+
+  // ---------- 19. 全屏覆盖层下的拖拽与点击（实机踩过的坑） ----------
+  console.log("--> 19. 全屏覆盖层下仍能拖拽与点击");
+  // 实机上线：播放器区域最上层是 #__h5player —— 全屏透明但 pointer-events:auto，
+  // 既不在多屏容器内也不是容器祖先。事件若挂在容器或容器祖先上，玩家在播放器区域的
+  // 所有按下都收不到，拖拽与点击整体失效。这里用一个等价的覆盖层守住这件事。
+  enterGrid(win, 2);
+  const overlay = win.document.createElement("div");
+  overlay.id = "fakeOverlay";
+  overlay.style.position = "fixed";
+  overlay.style.left = "0px";
+  overlay.style.top = "0px";
+  overlay.style.width = RECT.width + "px";
+  overlay.style.height = RECT.height + "px";
+  overlay.style.zIndex = "99999";
+  win.document.body.appendChild(overlay);
+  assert.ok(win.MultiScreen_getContainer().contains(overlay) === false, "覆盖层必须在容器之外（复刻实机的两棵树结构）");
+
+  // 拖拽：按下发生在覆盖层上，仍必须能起手并换位
+  const before19 = win.MultiScreen_getList().map((r) => String(r.rid));
+  const mdO = new win.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  overlay.dispatchEvent(mdO);
+  await sleep(350);
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 1, "覆盖层上的长按必须仍能进入拖拽");
+  const mmO = new win.MouseEvent("mousemove", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  overlay.dispatchEvent(mmO);
+  const muO = new win.MouseEvent("mouseup", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  overlay.dispatchEvent(muO);
+  const after19 = win.MultiScreen_getList().map((r) => String(r.rid));
+  assert.strictEqual(after19[0], before19[1], "覆盖层上的拖拽也必须真的完成换位，实际 " + JSON.stringify(after19));
+  assert.strictEqual(after19[1], before19[0], "覆盖层上的拖拽换位必须成对交换");
+
+  // 点击：**绝不能跳转**（原生多屏点格子不离开当前页），且自有界面必须被排除
+  const opened = [];
+  const origOpen = win.open;
+  win.open = function (u) { opened.push(u); return null; };
+  const origHref = win.location.href;
+  try {
+    // 点外房格：不得开新标签、不得改地址
+    overlay.dispatchEvent(new win.MouseEvent("click", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+    assert.strictEqual(opened.length, 0, "点外房格不得跳转，实际 " + JSON.stringify(opened));
+    assert.strictEqual(String(win.location.href), String(origHref), "点外房格不得改地址");
+    // 点主画面格：同样不接管
+    overlay.dispatchEvent(new win.MouseEvent("click", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+    assert.strictEqual(opened.length, 0, "点主画面格不得跳转");
+    // 死区：不接管
+    overlay.dispatchEvent(new win.MouseEvent("click", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.02 * RECT.height, bubbles: true }));
+    assert.strictEqual(opened.length, 0, "死区不得触发任何跳转");
+
+    // 自有界面必须被整片排除：面板上的点击不得被当成点格子
+    win.createPopupPlayerPanel();
+    assert.strictEqual(win.document.getElementById("popup-ms-edit"), null, "面板上不得再有「编辑位置顺序」按钮（编辑条已删）");
+    const panelEl = win.document.querySelector(".popup-player-panel");
+    panelEl.style.position = "fixed";
+    panelEl.style.left = "0px";
+    panelEl.style.top = "0px";
+    panelEl.style.width = RECT.width + "px";
+    panelEl.style.height = RECT.height + "px";
+    const panelBtn = win.document.createElement("button");
+    panelBtn.type = "button";
+    panelEl.appendChild(panelBtn);
+    // 落点在外房格正中央，但目标在面板里 —— 必须被排除
+    panelBtn.dispatchEvent(new win.MouseEvent("click", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+    assert.strictEqual(opened.length, 0, "面板里的点击绝不能被当成点格子");
+
+    // 重载按钮热区必须被代理：命中就触发按钮自己的点击，而不是跳转
+    const slot1 = cellPos(win, 1);
+    const fakeBtn = win.document.createElement("button");
+    fakeBtn.className = "ms-slot__reload is-visible";
+    let reloaded = 0;
+    fakeBtn.addEventListener("click", function () { reloaded++; });
+    slot1.appendChild(fakeBtn);
+    fakeBtn.getBoundingClientRect = () => ({ left: RECT.width * 0.7, top: RECT.height * 0.4, width: 86, height: 34, right: RECT.width * 0.7 + 86, bottom: RECT.height * 0.4 + 34 });
+    const bx = RECT.width * 0.7 + 40, by = RECT.height * 0.4 + 16;
+    overlay.dispatchEvent(new win.MouseEvent("click", { button: 0, clientX: bx, clientY: by, bubbles: true }));
+    assert.strictEqual(reloaded, 1, "命中重载按钮热区必须触发重载（实机点它被覆盖层挡住）");
+    assert.strictEqual(opened.length, 0, "重载按钮点击不得跳转");
+    fakeBtn.remove();
+    panelBtn.remove();
+  } finally {
+    win.open = origOpen;
+    overlay.remove();
+  }
+  // ---------- 20. 槽位被页面重建后的自愈 ----------
+  console.log("--> 20. 槽位被重建后自愈");
+  // 实机上线：斗鱼在播放器初始化/切房时会重建容器里的槽位节点，内联尺寸与格子内容
+  // 一起丢掉、容器类名却还留着 is-multiN，格子会静默塌回一格。这里如实复刻该场景。
+  enterGrid(win, 3);
+  const c20 = win.document.getElementById("js-player-multiContainer");
+  assert.strictEqual(slotOf(win, 0).style.left, "0.8%", "前置条件：3 分屏布局已生效");
+  // 模拟页面重建：把槽位节点整体换成全新的空节点（类名保留）
+  const rebuilt = [];
+  Array.prototype.slice.call(c20.children).forEach(function (old) {
+    const neu = win.document.createElement("div");
+    neu.className = old.className;
+    c20.replaceChild(neu, old);
+    rebuilt.push(neu);
+  });
+  assert.strictEqual(c20.classList.contains("is-multi3"), true, "容器类名会残留（这正是问题所在）");
+  assert.strictEqual(c20.children[0].style.left, "", "重建后的槽位没有内联尺寸");
+  // 自愈是 250ms 防抖的，等它跑完
+  await sleep(420);
+  assert.strictEqual(c20.children[0].style.left, "0.8%", "自愈后槽 0 的布局必须补回来");
+  assert.strictEqual(c20.children[1].style.left, "66.4%", "自愈后槽 1 的布局必须补回来");
+  assert.strictEqual(c20.children[1].style.zIndex, "4", "自愈后 z 序必须补回来");
+  // 播放器节点被一起带走的那几格要重新渲染
+  assert.ok(c20.children[1].querySelector(".ms-slot__video"), "自愈后外房格必须重新长出播放器节点");
+  assert.ok(c20.children[1].querySelector(".ms-slot__name-text"), "自愈后房名胶囊必须重新长出");
+  // 拖拽期间绝不能自愈（否则会跟拖拽抢 DOM）
+  enterGrid(win, 2);
+  const md20 = new win.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(md20);
+  await sleep(350);
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 1, "前置条件：已进入拖拽");
+  await sleep(500);
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 1, "拖拽期间不得被自愈打断");
+  assert.ok(container.querySelector(".ms-slot--placeholder"), "拖拽期间占位块不得被自愈清掉");
+  const mu20 = new win.MouseEvent("mouseup", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(mu20);
+  await sleep(420);
+  assert.strictEqual(win.document.querySelectorAll(".dragging-player").length, 0, "原地松手后必须收尾干净");
+  // ---------- 21. 主画面格换位后其内容绝不能被清掉 ----------
+  console.log("--> 21. 主画面格换位后内容不被清空");
+  // 实机线上：换位后主画面格跑到位置 1，按位置渲染/清理就把斗鱼播放器的 DOM 连根拔掉了
+  // （#__video2 消失、主房间加载出错）。判据必须是格子身份而不是位置。
+  enterGrid(win, 2);
+  const mainCell21 = slotOf(win, 0);   // 主画面格（身份 0）
+  assert.strictEqual(cellPos(win, 0), mainCell21, "前置条件：主画面格在位置 0");
+  // 模拟斗鱼自己的播放器内容
+  mainCell21.innerHTML = "";
+  const playerNode = win.document.createElement("div");
+  playerNode.id = "fakeRealPlayer";
+  playerNode.innerHTML = "<video id='fakeRealVideo'></video>";
+  mainCell21.appendChild(playerNode);
+  // 长按从位置 0 拖到位置 1（主画面格被换到位置 1）
+  const md21 = new win.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(md21);
+  await sleep(350);
+  const mm21 = new win.MouseEvent("mousemove", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(mm21);
+  const mu21 = new win.MouseEvent("mouseup", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true });
+  container.dispatchEvent(mu21);
+  await sleep(700);   // 越过换位后的 500ms 落定
+  // 数据换了、几何换了，但主画面格的内容必须原封不动
+  assert.strictEqual(cellPos(win, 1), mainCell21, "主画面格必须已换到位置 1");
+  assert.ok(mainCell21.querySelector("#fakeRealPlayer"), "主画面格里的播放器节点绝不能被清掉");
+  assert.ok(mainCell21.querySelector("#fakeRealVideo"), "主画面格里的 <video> 绝不能被清掉");
+  assert.strictEqual(mainCell21.classList.contains("ms-slot--notice"), false, "主画面格不得残留通知态类");
+  assert.strictEqual(mainCell21.classList.contains("ms-slot--loading"), false, "主画面格不得残留加载态类");
+  assert.strictEqual(mainCell21.querySelectorAll(".ms-slot__video").length, 0, "不得往主画面格里写我们的播放器");
+  // 位置 0 现在坐的是外房格，必须被正常渲染
+  const idx0Cell = cellPos(win, 0);
+  assert.notStrictEqual(idx0Cell, mainCell21, "位置 0 必须已换成外房格");
+  assert.ok(idx0Cell.querySelector(".ms-slot__video"), "位置 0 的外房格必须被渲染出播放器");
+  assert.ok(idx0Cell.querySelector(".ms-slot__name-text"), "位置 0 的外房格必须有房名胶囊");
+  // ---------- 22. 单屏状态绝不碰槽位尺寸（否则飘屏会整体消失） ----------
+  console.log("--> 22. 单屏状态不动槽位尺寸");
+  // 实机线上：单屏时走了"失活位置清零隐藏"的分支，把全部 5 个槽位写成 0x0，
+  // 连主画面格一起 —— 播放器区域零尺寸后原生弹幕飘屏直接不再出现（引擎轨道数按容器尺寸算）。
+  win.MultiScreen_exit();
+  assert.strictEqual(win.MultiScreen_getList().length, 1, "退出后只剩主房间");
+  for (let i = 0; i < 5; i++) {
+    const el = slotOf(win, i);
+    if (!el) continue;
+    assert.strictEqual(el.style.width, "", "单屏下槽 " + i + " 不得残留内联宽度");
+    assert.strictEqual(el.style.height, "", "单屏下槽 " + i + " 不得残留内联高度");
+    assert.strictEqual(el.style.visibility, "", "单屏下槽 " + i + " 不得被隐藏");
+    assert.strictEqual(el.style.transform, "", "单屏下槽 " + i + " 不得残留 transform");
+  }
+  assert.strictEqual(container.className, "layout-Player-multiContainer", "单屏下容器类名必须回到原生")
+  // ---------- 23. 绝不给 #__h5player 设 pointer-events（会连坐整棵原生弹幕树） ----------
+  console.log("--> 23. 不得改写 #__h5player 的 pointer-events");
+  /* 实测（2026-09-29，2288 房间）：
+     · 弹幕层就在这棵树里：.danmuItem → div.danmu-fbb2a3 → div.comment-* → **#__h5player**
+       （悬停暂停的弹幕会被原生搬进 #comment-higher-container，它也在里面）
+     · pointer-events 是继承属性：整棵树置 none 后，只有**自己显式声明 auto** 的后代还能点
+       —— 弹幕节点与悬停快捷菜单恰好都声明了，于是故障被掩盖成"右键面板点 × 关不掉"
+       "菜单卡住不走、后续悬停像没悬停上"这类"看得见、点不动"。
+     · 这个补丁**没有**带来它声称的好处：还原成 auto 后量测，弹幕节点在自身坐标上依旧是最顶层命中目标。
+     所以这条纪律必须钉住：那棵树一格 pointer-events 都不要动。 */
+  const stripMsComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const msSrc = stripMsComments(fs.readFileSync(path.join(__dirname, "../src/packages/PopupPlayer/PopupPlayer_MultiScreen.js"), "utf8"));
+  assert.strictEqual(/pointerEvents|pointer-events/.test(msSrc), false, "多屏代码不得再出现 pointer-events 改写（原生弹幕层在 #__h5player 里）");
+  const msBundle = bundleText();
+  assert.strictEqual(msBundle.indexOf("data-ex-ms-passthrough") < 0, true, "产物里不得残留覆盖层放行标记（源码改了没重建也会被这条抓住）");
+  // ---------- 24. 自动清晰度：按格子实际渲染高度选档 + 平滑换档 ----------
+  console.log("--> 24. 自动清晰度按格子尺寸选档、换档平滑过渡");
+  /* 动机（用户反馈 + 实测）：多屏后小格在屏幕上只有约 330×186，而默认档 qn0 拿到的是
+     2560×1440 —— 纯浪费。自动档按**量到的格子高度**选档，手动选档仍然覆盖它。
+     用户口径（2026-09-29）：**两房/四房那种大小（格子约占播放区一半高）要给最高档**。 */
+  const win24 = load(makeDom());
+  win24.MultiScreen_enter([
+    { rid: "1001", nn: "甲", avatar: "" }, { rid: "1002", nn: "乙", avatar: "" },
+    { rid: "1003", nn: "丙", avatar: "" }, { rid: "1004", nn: "丁", avatar: "" },
+    { rid: "1005", nn: "戊", avatar: "" }
+  ]);
+  assert.strictEqual(win24.MultiScreen_getQuality(), "auto", "默认档位必须是自动");
+  const slots24 = win24.MultiScreen_slots();
+  // 播放区按 800×450 建模（比例规则的基准），各格再各自给高度
+  stubRect(win24.MultiScreen_getContainer(), { left: 0, top: 0, width: 800, height: 450, right: 800, bottom: 450 });
+  const setH = (i, h) => { const el = slots24[i]; el.getBoundingClientRect = () => ({ left: 0, top: 0, width: Math.round(h * 16 / 9), height: h, right: Math.round(h * 16 / 9), bottom: h }); };
+  setH(0, 900); setH(1, 286); setH(2, 235); setH(3, 200); setH(4, 120);
+  // 进多屏的**第一次**取流发生在布局套上去之前（DOM 还没尺寸）→ 必须用布局表推算，
+  // 否则首屏会全部落到兜底档（实机踩过：进多屏全是 540p，缩放一下才升档）
+  const win24b = load(makeDom());
+  stubRect(win24b.MultiScreen_getContainer(), { left: 0, top: 0, width: 800, height: 450, right: 800, bottom: 450 });
+  win24b.MultiScreen_enter([{ rid: "2001", nn: "甲", avatar: "" }]);
+  // ⚠ 列表里 [0] 恒为主房间，所以"两房"= 只传 1 个外房
+  assert.strictEqual(win24b.MultiScreen_pickQnForSlot(1), "0", "两房布局（占播放区 50%）必须给最高档 —— 即使 DOM 还没量到尺寸");
+  win24b.close();
+  assert.strictEqual(win24.MultiScreen_pickQnForSlot(0), "0", "大格必须给最高档");
+  assert.strictEqual(win24.MultiScreen_pickQnForSlot(1), "0", "两房那种大小（占播放区 64%）必须给最高档");
+  assert.strictEqual(win24.MultiScreen_pickQnForSlot(2), "0", "五房的大格（占播放区 52%）也按最高档 —— 用比例判，不受窗口大小影响");
+  assert.strictEqual(win24.MultiScreen_pickQnForSlot(3), "2", "占比不足且 180~280px 必须给高清");
+  assert.strictEqual(win24.MultiScreen_pickQnForSlot(4), "1", "180px 以下必须给流畅，绝不能反而给高码率");
+  // 手动选具体档位 → 覆盖自动，尺寸不再影响结果
+  win24.MultiScreen_setQuality("3");
+  assert.strictEqual(win24.MultiScreen_qnFor(4), "3", "手动选档后必须无视格子尺寸");
+  assert.strictEqual(win24.MultiScreen_qnFor(0), "3", "手动档位对所有外房生效");
+  // 切回自动 → 立刻按尺寸重新选档
+  win24.MultiScreen_setQuality("auto");
+  assert.strictEqual(win24.MultiScreen_qnFor(4), "1", "切回自动后必须重新按尺寸选档");
+
+  // 换档必须**不清空格子**（双画面交叉过渡）：新流叠一层，出画面后淡入、随后撤旧流
+  win24.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/probe.flv"); };
+  win24.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win24.MultiScreen_renderSlot(2, { rid: "1003", nn: "丙" });
+  const oldVid24 = slots24[2].querySelector("video.ms-slot__video");
+  assert.ok(oldVid24, "换档前必须已有旧画面");
+  Object.defineProperty(oldVid24, "readyState", { value: 4, configurable: true });   // jsdom 不做加载，手动标成"可播"
+  win24.MultiScreen_switchQuality(2, { rid: "1003", nn: "丙" });
+  const nextVid24 = slots24[2].querySelector("video.ms-slot__video--next");
+  assert.ok(nextVid24, "换档必须叠一个新的 video，而不是清空格子");
+  assert.strictEqual(slots24[2].querySelector("video.ms-slot__video"), oldVid24, "切换成功前旧画面必须一直在（这就是「不黑屏」的关键）");
+  nextVid24.dispatchEvent(new win24.Event("playing"));   // 模拟新流出画面
+  assert.ok(nextVid24.classList.contains("is-live"), "新流出画面后必须进入淡入态");
+  await new Promise((r) => setTimeout(r, 450));          // 等淡入走完（320ms 后撤旧流）
+  assert.strictEqual(oldVid24.isConnected, false, "淡入完成后旧画面必须被撤掉");
+  assert.strictEqual(slots24[2].querySelectorAll("video").length, 1, "格子里只剩新画面（不能新旧叠着留一层）");
+
+  // 换档失败（取流拿不到）：必须保住旧画面，把半成品撤掉
+  const oldVid24b = slots24[3].querySelector("video.ms-slot__video");
+  if (!oldVid24b) { win24.MultiScreen_renderSlot(3, { rid: "1004", nn: "丁" }); }
+  const keepVid = slots24[3].querySelector("video.ms-slot__video");
+  Object.defineProperty(keepVid, "readyState", { value: 4, configurable: true });
+  win24.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("None"); };   // 房间未开播/取流失败
+  win24.MultiScreen_switchQuality(3, { rid: "1004", nn: "丁" });
+  assert.strictEqual(slots24[3].querySelector("video.ms-slot__video"), keepVid, "换档失败必须保住旧画面");
+  assert.strictEqual(slots24[3].querySelector("video.ms-slot__video--next"), null, "换档失败必须撤掉半成品，不留黑层");
+
+  // 档位没变时不换档（resize 抖动不该反复重载）
+  win24.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/probe.flv"); };
+  win24.MultiScreen_renderSlot(2, { rid: "1003", nn: "丙" });
+  const v24a = slots24[2].querySelector("video");
+  Object.defineProperty(v24a, "readyState", { value: 4, configurable: true });
+  setH(2, 240);                                   // 与 235 同档
+  win24.MultiScreen_reapplyAutoQuality();
+  assert.strictEqual(slots24[2].querySelector("video.ms-slot__video--next"), null, "同档 resize 不得触发换档");
+  setH(2, 120);                                   // 跨档（0 → 1）
+  win24.MultiScreen_reapplyAutoQuality();
+  assert.ok(slots24[2].querySelector("video.ms-slot__video--next"), "跨档后必须发起换档（走平滑路径）");
+  win24.close();
+
+  // ---------- 25. 每房间音量 / 按主房记忆 / 外房失败自动重试 ----------
+  console.log("--> 25. 音量、按主房记忆、自动重试");
+  const win25 = load(makeDom());
+  // 主房视频（斗鱼自己的播放器）也造一个，验证主房音量落在它身上
+  const nativeVid = win25.document.createElement("video");
+  nativeVid.id = "__video2";
+  nativeVid.volume = 1;
+  win25.document.body.appendChild(nativeVid);
+  win25.MultiScreen_enter([{ rid: "3001", nn: "甲", avatar: "" }, { rid: "3002", nn: "乙", avatar: "" }]);
+  assert.strictEqual(win25.MultiScreen_getVolume("3001", false), 0, "外房默认静音（0）");
+  assert.strictEqual(win25.MultiScreen_getVolume(win25.MultiScreen_getMainRid(), true), 1, "主房默认满音量（1）");
+  win25.MultiScreen_setVolume("3001", 0.5);
+  assert.strictEqual(win25.MultiScreen_getVolume("3001", false), 0.5, "设置后必须记住");
+  assert.ok(String(win25.localStorage.getItem("ExSave_MultiScreenVol")).indexOf("0.5") >= 0, "音量必须持久化到 ExSave_MultiScreenVol");
+  // 音量落到格子里的 <video> 上（0 = 静音）
+  win25.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/v.flv"); };
+  win25.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win25.MultiScreen_renderSlot(1, { rid: "3001", nn: "甲" });
+  const slot25 = win25.MultiScreen_slots()[1];
+  const v25 = slot25.querySelector("video");
+  v25.dispatchEvent(new win25.Event("playing"));
+  assert.strictEqual(v25.volume, 0.5, "出画面后必须套上该房间存的音量");
+  assert.strictEqual(v25.muted, false, "音量 > 0 时不能还是静音");
+  win25.MultiScreen_setVolume("3001", 0);
+  assert.strictEqual(v25.muted, true, "音量 0 必须静音");
+  // 主房音量落在斗鱼自己的视频上
+  win25.MultiScreen_setVolume(win25.MultiScreen_getMainRid(), 0.3);
+  assert.strictEqual(nativeVid.volume, 0.3, "主房音量必须落在原生播放器的 video 上");
+
+  // 按主房记忆：多屏配置写进 ExSave_MultiScreenByRoom，退出后清掉
+  const byRoom = JSON.parse(win25.localStorage.getItem("ExSave_MultiScreenByRoom") || "{}");
+  const mainRid25 = win25.MultiScreen_getMainRid();
+  assert.ok(byRoom[mainRid25] && byRoom[mainRid25].rooms.length === 2, "必须按主房记住多屏配置");
+  assert.strictEqual(win25.MultiScreen_savedConfigForMainRoom(), null, "当前列表就是这套配置时不必提示恢复");
+  // 退出多屏回到单屏（用户 2026-10-06 后：removeRoom 已经没有"最少 2 个"的门槛，可以直接退到单屏）
+  win25.MultiScreen_removeRoom("3002");
+  win25.MultiScreen_exit();
+  const saved25 = win25.MultiScreen_savedConfigForMainRoom();
+  assert.ok(saved25 && saved25.length === 1, "回到单屏后必须能取回上次配置（供一键恢复），实际 " + JSON.stringify(saved25));
+  const byRoom2 = JSON.parse(win25.localStorage.getItem("ExSave_MultiScreenByRoom") || "{}");
+  assert.ok(byRoom2[mainRid25] && byRoom2[mainRid25].rooms.length === 1, "退出多屏后记录必须还在（否则一键恢复没得恢复）");
+
+  // 换档（双画面交叉过渡）后音量必须跟着新流走 —— 用户 2026-10-06 报"切清晰度声音就没了，
+  // 手动拉一下音量才回来"：新流是静音起播的，出画面那一刻必须把该房间存的音量补上。
+  const win29 = load(makeDom());
+  win29.MultiScreen_enter([{ rid: "7001", nn: "甲", avatar: "" }]);
+  win29.MultiScreen_setVolume("7001", 0.6);
+  win29.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/v.flv"); };
+  win29.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win29.MultiScreen_renderSlot(1, { rid: "7001", nn: "甲" });
+  const slot29 = win29.MultiScreen_slots()[1];
+  const vOld29 = slot29.querySelector(".ms-slot__video");
+  Object.defineProperty(vOld29, "readyState", { value: 3, configurable: true });   // 旧流已有可播数据（才有"画面"可保住）
+  vOld29.dispatchEvent(new win29.Event("playing"));
+  assert.strictEqual(vOld29.volume, 0.6, "前置条件：换档前旧流已套上该房间的音量");
+  win29.MultiScreen_switchQuality(1, { rid: "7001", nn: "甲" });
+  const vNew29 = slot29.querySelector(".ms-slot__video--next");
+  assert.ok(vNew29, "有画面的格子换档必须走双画面交叉过渡（新建一路播放器）");
+  assert.strictEqual(vNew29.muted, true, "新流起播前必须先静音（浏览器对带声音自动播放有限制）");
+  vNew29.dispatchEvent(new win29.Event("playing"));
+  assert.strictEqual(vNew29.muted, false, "新流出画面后必须立刻取消静音");
+  assert.strictEqual(vNew29.volume, 0.6, "换档后新流必须继承该房间的音量（实际 " + vNew29.volume + "），否则表现为「切完档没声音」");
+  win29.close();
+
+  // 外房失败自动重试一次：第一次失败不提示、隔 2 秒再试一次
+  const win26 = load(makeDom());
+  win26.MultiScreen_enter([{ rid: "4001", nn: "丙", avatar: "" }]);
+  let calls = 0;
+  win26.getRealLive_Douyu = function (rid, v, https, qn, cb) { calls++; cb("None"); };
+  win26.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win26.MultiScreen_renderSlot(1, { rid: "4001", nn: "丙" });
+  assert.strictEqual(calls, 1, "第一次取流必须发生");
+  assert.strictEqual(win26.MultiScreen_slots()[1].classList.contains("ms-slot--notice"), false, "第一次失败不得立刻弹提示（先自动重试）");
+  await new Promise((r) => setTimeout(r, 2400));
+  assert.strictEqual(calls, 2, "2 秒后必须自动重试一次（实际取流 " + calls + " 次）");
+  assert.ok(win26.MultiScreen_slots()[1].classList.contains("ms-slot--notice"), "重试仍失败才给提示");
+  win25.close();
+  win26.close();
+
+  // ---------- 26. 每房间「合入弹幕 / 合入画面」开关 ----------
+  console.log("--> 26. 每房间合入开关（弹幕 / 画面）");
+  /* 用户 2026-09-30 反馈"合入弹幕和直播流的按钮也没有"：这两把开关必须是**每房间**的、
+     缺省即开、关掉立刻生效，并且跟着"按主房记忆"一起存 —— 否则下次恢复多屏又全开了。 */
+  const win27 = load(makeDom());
+  stubRect(win27.MultiScreen_getContainer(), RECT);
+  win27.MultiScreen_enter([{ rid: "5001", nn: "甲", avatar: "" }, { rid: "5002", nn: "乙", avatar: "" }]);
+  const mainRid27 = win27.MultiScreen_getMainRid();
+  assert.strictEqual(win27.MultiScreen_isRoomOn("5001", "danmaku"), true, "合入弹幕缺省必须是开");
+  assert.strictEqual(win27.MultiScreen_isRoomOn("5001", "video"), true, "合入画面缺省必须是开");
+  assert.strictEqual(win27.MultiScreen_setRoomFlag(mainRid27, "video", false), false, "主房间没有合入开关（它本来就是原生本体）");
+  assert.strictEqual(win27.MultiScreen_setRoomFlag("5001", "video", true), false, "重复设置同一个状态必须返回「没变化」");
+  let notified27 = 0;
+  win27.MultiScreen_onChange(function () { notified27++; });
+  /* 关画面（用户 2026-10-06 改口径）：这个房间**不占格子** —— 版面按"有画面的房间数"重排，
+     它只不取流、不建播放器（弹幕照合）。旧口径是"格子留占位"，用户明确否掉了。 */
+  assert.strictEqual(win27.MultiScreen_setRoomFlag("5001", "video", false), true, "关闭画面必须返回「变了」");
+  assert.strictEqual(notified27 > 0, true, "开关变化必须通知订阅者（合并侧靠它重建连接）");
+  const slot27 = win27.MultiScreen_slots()[win27.MultiScreen_slotIndexOfRid("5001")];
+  assert.strictEqual(slot27.querySelectorAll("video").length, 0, "关掉画面的格子不得再建播放器");
+  assert.strictEqual(slot27.classList.contains("ms-slot--novideo"), true, "关掉画面的格子要留「这是有意为之」的标记（自愈据此跳过）");
+  assert.strictEqual(slot27.style.width, "0px", "关掉画面的格子必须被清零（不占位），实际 " + slot27.style.width);
+  assert.strictEqual(slot27.style.visibility, "hidden", "关掉画面的格子必须隐藏");
+  assert.strictEqual(
+    win27.MultiScreen_getContainer().className,
+    "layout-Player-multiContainer is-multi is-multi2",
+    "3 房关掉 1 路画面后必须按 2 格版面排（实际 " + win27.MultiScreen_getContainer().className + "）"
+  );
+  const slots27 = win27.MultiScreen_slots();
+  assert.strictEqual(slots27[0].style.left, "0%", "主画面格按 2 格版面占左半");
+  assert.strictEqual(slots27[0].style.width, "50%", "主画面格按 2 格版面占一半宽");
+  assert.strictEqual(slots27[2].style.left, "50%", "剩下的那个有画面的外房按 2 格版面占右半");
+  assert.strictEqual(win27.MultiScreen_hitTest(0.75 * RECT.width, 0.5 * RECT.height, true), 2, "2 格版面里点右半必须命中「那个有画面的外房」所在的**位置**（不是被关掉的那格）");
+  assert.strictEqual(win27.MultiScreen_roomQnName("5001"), "", "关掉画面的房间没有档位角标");
+  // 自愈不得把有意为之的占位当成"丢了画面"重新渲染
+  const healVideoCount = slot27.querySelectorAll("video").length;
+  win27.MultiScreen_reapplyAutoQuality();
+  assert.strictEqual(slot27.querySelectorAll("video").length, healVideoCount, "自动换档不得给关掉画面的格子取流");
+  // 持久化：开关要进 ExSave_MultiScreen 与按主房记忆
+  assert.ok(String(win27.localStorage.getItem("ExSave_MultiScreen")).indexOf('"video":false') >= 0, "开关必须持久化到 ExSave_MultiScreen");
+  const byRoom27 = JSON.parse(win27.localStorage.getItem("ExSave_MultiScreenByRoom") || "{}");
+  const rec27 = (byRoom27[mainRid27] && byRoom27[mainRid27].rooms || []).filter(function (r) { return String(r.rid) === "5001"; })[0];
+  assert.ok(rec27 && rec27.video === false, "按主房记忆里必须带上开关，实际 " + JSON.stringify(rec27));
+  // 格子里那枚「开启画面」= 把开关拨回去（格子此刻被版面隐藏着，等价于面板上的胶囊）
+  slot27.querySelector(".ms-slot__reload").dispatchEvent(new win27.MouseEvent("click", { bubbles: true }));
+  assert.strictEqual(win27.MultiScreen_isRoomOn("5001", "video"), true, "点「开启画面」必须把开关拨回开");
+  assert.ok(slot27.querySelector("video"), "开启画面后必须重新建出播放器");
+  assert.strictEqual(
+    win27.MultiScreen_getContainer().className,
+    "layout-Player-multiContainer is-multi is-multi3",
+    "拨回画面后必须回到 3 格版面"
+  );
+  assert.strictEqual(slot27.style.visibility, "visible", "拨回画面后该格必须重新可见");
+  // 关弹幕：不建连接，挂起队列里属于它的报文也一并丢掉
+  /* ⚠ Ex_WebSocket_UnLogin 是产物内的模块级 class（不是 window 属性），从测试外面替换不了它；
+     能替换的是它内部用的全局 WebSocket —— 换成一个不会真的联网的空壳即可。 */
+  win27.WebSocket = function (url) {
+    this.url = String(url);
+    this.send = function () {};
+    this.close = function () {};
+  };
+  win27.MergeDanmaku_syncConnections();
+  assert.strictEqual(win27.MergeDanmaku_getStats().conns.join(","), "5001,5002", "两个外房都要建弹幕连接（实际 " + win27.MergeDanmaku_getStats().conns.join(",") + "）");
+  win27.MergeDanmaku_push({ text: "挂着的一条", uid: "u9", cid: "", packet: "type@=chatmsg/txt@=挂着的一条/", srcRid: "5002", srcName: "乙" });
+  assert.strictEqual(win27.MergeDanmaku_getStats().held, 1, "总线未就位时先挂起（前置条件）");
+  assert.strictEqual(win27.MultiScreen_setRoomFlag("5002", "danmaku", false), true, "关掉合入弹幕必须返回「变了」");
+  win27.MergeDanmaku_syncConnections();
+  assert.strictEqual(win27.MergeDanmaku_getStats().conns.join(","), "5001", "关掉合入弹幕的房间必须断开连接");
+  assert.strictEqual(win27.MergeDanmaku_getStats().held, 0, "关掉合入弹幕时，挂起队列里属于该房间的报文必须一并丢掉");
+  /* 移除一个「已关画面」的房间：它的格子必须被清空（不能留着"已关闭画面"的占位）——
+     这个位置此后不属于任何房间，占位留着就是颗雷（实机自用一遍时发现过）。放在这里做，
+     是因为它会把房间从列表里去掉，不影响后面还有的断言已经跑完。 */
+  assert.strictEqual(win27.MultiScreen_setRoomFlag("5001", "video", false), true, "（前置）把 5001 的画面关掉");
+  assert.strictEqual(slot27.classList.contains("ms-slot--novideo"), true, "（前置）此时格子处于「只合入弹幕」占位态");
+  win27.MultiScreen_removeRoom("5001");
+  assert.strictEqual(slot27.classList.contains("ms-slot--novideo"), false, "移除房间后，格子里的「已关闭画面」占位必须被清掉");
+  assert.ok(!/已关闭画面/.test(slot27.textContent), "移除房间后格子里不得再留占位文案，实际：" + slot27.textContent);
+  win27.close();
+
+  // ---------- 27. 面板上的合入开关与外房清晰度 ----------
+  console.log("--> 27. 面板：合入开关 / 清晰度胶囊 / 档位角标");
+  const win28 = load(makeDom());
+  win28.createPopupPlayerPanel();
+  win28.MultiScreen_enter([{ rid: "6001", nn: "甲", avatar: "" }, { rid: "6002", nn: "乙", avatar: "" }]);
+  win28.PopupPlayer_renderMultiPage();
+  const panel28 = win28.document.querySelector(".popup-player-panel");
+  const rows28 = panel28.querySelectorAll(".popup-ms__room");
+  assert.strictEqual(rows28.length, 3, "三行：主房间 + 两个外房（实际 " + rows28.length + "）");
+  assert.strictEqual(rows28[0].querySelectorAll(".popup-ms__chip").length, 0, "主房间不得有合入开关");
+  const row28a = panel28.querySelector('.popup-ms__room[data-rid="6001"]');
+  const chips28 = row28a.querySelectorAll(".popup-ms__chip");
+  assert.strictEqual(chips28.length, 2, "每个外房必须有两枚合入胶囊（弹幕 / 画面）");
+  assert.strictEqual(row28a.querySelector('.popup-ms__chip[data-key="danmaku"]').getAttribute("aria-pressed"), "true", "胶囊缺省必须是开");
+  // 点「画面」→ 真的关掉，并且重画后胶囊显示关闭态
+  row28a.querySelector('.popup-ms__chip[data-key="video"]').dispatchEvent(new win28.MouseEvent("click", { bubbles: true }));
+  assert.strictEqual(win28.MultiScreen_isRoomOn("6001", "video"), false, "点一下胶囊必须真的关掉画面");
+  const row28b = win28.document.querySelector('.popup-ms__room[data-rid="6001"]');
+  assert.strictEqual(row28b.querySelector('.popup-ms__chip[data-key="video"]').getAttribute("aria-pressed"), "false", "重画后胶囊必须显示关闭态");
+  assert.strictEqual(row28b.querySelectorAll(".popup-ms__room-qn").length, 0, "关掉画面的房间不显示档位角标");
+  // 清晰度胶囊：五档齐全、与状态同步、点击落到多屏
+  const qBox28 = win28.document.getElementById("popup-ms-quality");
+  assert.strictEqual(qBox28.querySelectorAll('input[name="ms_quality_panel"]').length, 5, "清晰度必须五档齐全");
+  assert.strictEqual(qBox28.querySelector('input[value="auto"]').checked, true, "缺省必须是自动档");
+  const r28 = qBox28.querySelector('input[value="1"]');
+  r28.checked = true;
+  r28.dispatchEvent(new win28.Event("change", { bubbles: true }));
+  assert.strictEqual(win28.MultiScreen_getQuality(), "1", "在面板上选档必须落到多屏状态");
+  assert.strictEqual(win28.MultiScreen_roomQnName("6002"), "流畅", "档位换了，角标也必须跟着换（单一数据源：面板胶囊）");
+  const badge28 = win28.document.querySelector('.popup-ms__room[data-rid="6002"] .popup-ms__room-qn');
+  assert.ok(badge28, "外房必须显示当前档位角标");
+  assert.strictEqual(badge28.textContent, "流畅", "手动选流畅后角标必须是流畅，实际 " + badge28.textContent);
+  win28.close();
+
+  // ---------- 27.1 面板（本轮修复）：主房间房名 / 粘底主按钮 / ESC + 指示条 / 结果行键盘可达 ----------
+  console.log("--> 27.1 面板：主房间房名取本页标题栏");
+  const winFx = load(makeDom());
+  // 斗鱼房间页标题栏里的主播名（真实版式 .Title-anchorName）
+  const anchorNameFx = winFx.document.createElement("div");
+  anchorNameFx.className = "Title-anchorName";
+  anchorNameFx.textContent = "本页主播";
+  winFx.document.body.appendChild(anchorNameFx);
+  winFx.createPopupPlayerPanel();
+  winFx.PopupPlayer_renderMultiPage();
+  const panelFx = winFx.document.querySelector(".popup-player-panel");
+  const mainRowSelFx = '.popup-ms__room[data-rid="' + RID + '"] .popup-ms__room-name';
+  const mainNameFx = panelFx.querySelector(mainRowSelFx);
+  assert.ok(mainNameFx, "面板第一行必须是主房间");
+  assert.strictEqual(
+    mainNameFx.textContent,
+    "本页主播",
+    "主房间行必须显示主播名（先取本页标题栏），不能停在「房间 " + RID + "」，实际: " + mainNameFx.textContent
+  );
+  // 再重画一次：非多屏态的那一行是每次新建的虚拟行，守卫不得挡掉缓存/页面名回填
+  winFx.PopupPlayer_renderMultiPage();
+  assert.strictEqual(
+    panelFx.querySelector(mainRowSelFx).textContent,
+    "本页主播",
+    "重画后主房间名不得退化成一串房间号"
+  );
+
+  console.log("--> 27.2 面板：主按钮粘底（5 房内容高于面板时按钮仍在可视区）");
+  const actionWrapFx = panelFx.querySelector(".popup-panel__action-wrap");
+  assert.ok(actionWrapFx, "面板必须有底部操作区（主按钮常驻）");
+  const awStyleFx = actionWrapFx.getAttribute("style") || "";
+  assert.ok(/position:\s*sticky/.test(awStyleFx), "操作区必须 sticky 贴底，否则 5 房时「退出同屏」会被顶出可视区，实际: " + awStyleFx);
+  assert.ok(/bottom:\s*0/.test(awStyleFx), "粘底必须贴面板底边（bottom: 0），实际: " + awStyleFx);
+  /* 用户反馈（2026-10-27）：按钮底部那层白色渐变遮罩要去掉 —— 操作区不得再声明任何背景，
+     连 background 简写都不许出现（否则换个写法又能把渐变加回来）。 */
+  assert.ok(
+    !/linear-gradient/.test(awStyleFx),
+    "操作区不得再带白色渐变背景（用户要求删掉按钮底部的渐变），实际: " + awStyleFx
+  );
+  assert.ok(
+    !/background/i.test(awStyleFx),
+    "操作区不得声明任何 background（阶梯防回归：先禁渐变，再禁任何背景写法），实际: " + awStyleFx
+  );
+  assert.strictEqual(panelFx.querySelector("#popup-ms-toggle-btn").tagName, "BUTTON", "主按钮必须是 button（disabled 才生效）");
+
+  console.log("--> 27.3 面板：ESC 收起 + Dock 指示条随开合复位");
+  const dockFx = winFx.document.createElement("div");
+  dockFx.className = "ex-panel";
+  dockFx.innerHTML = '<div class="ex-panel__wrap"><div class="popup-player"><a class="ex-panel__icon"></a></div></div>';
+  winFx.document.body.appendChild(dockFx);
+  const dockBtnFx = dockFx.querySelector(".popup-player");
+  winFx.openMiuixPanelCentered(panelFx, dockBtnFx);
+  assert.strictEqual(panelFx.style.display, "flex", "必须是 flex 显示态（ESC 的判定依赖它）");
+  assert.ok(dockBtnFx.classList.contains("is-active"), "面板打开时 Dock 按钮必须点亮指示条");
+  winFx.document.dispatchEvent(new winFx.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.strictEqual(panelFx.style.display, "none", "ESC 必须收起面板");
+  assert.ok(!dockBtnFx.classList.contains("is-active"), "面板关闭后 Dock 指示条必须熄灭（is-active 只加不删的老问题）");
+  assert.ok(typeof winFx.updateDockActiveIndicator === "function", "updateDockActiveIndicator 必须真的存在（此前只有调用没有定义）");
+
+  console.log("--> 27.4 面板：搜索框内 ESC 放行 / 结果行键盘可达 / 关注列表失败不留加载态");
+  winFx.openMiuixPanelCentered(panelFx, dockBtnFx);
+  const searchInpFx = panelFx.querySelector("#popup-ms-search");
+  assert.ok(searchInpFx, "面板必须有搜索框");
+  searchInpFx.focus();
+  searchInpFx.dispatchEvent(new winFx.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.strictEqual(panelFx.style.display, "none", "搜索框聚焦时按 ESC 也必须能收起面板（stopPropagation 只拦其它键）");
+
+  const resultsBoxFx = panelFx.querySelector("#popup-ms-results");
+  winFx.PopupPlayer_msRenderResults([{ rid: "1001", nn: "一号房", showStatus: 1 }], "");
+  const resultRowFx = resultsBoxFx.querySelector(".popup-ms__result");
+  assert.ok(resultRowFx, "结果行必须渲染出来");
+  assert.strictEqual(resultRowFx.tagName, "BUTTON", "搜索结果行必须是 button（否则键盘 Tab 不到、加不了房）");
+  assert.strictEqual(resultRowFx.getAttribute("type"), "button", "结果行必须是 type=button，避免任何隐式提交语义");
+
+  // 验证收藏列表与五角星
+  const favBtnSrc = panelFx.querySelector('.popup-ms__src-btn[data-src="fav"]');
+  assert.ok(favBtnSrc, "面板必须包含平行的「收藏列表」按钮");
+  const starBtnFx = resultRowFx.querySelector(".popup-ms__fav-btn");
+  assert.ok(starBtnFx, "结果行必须包含五角星收藏按钮");
+  assert.strictEqual(starBtnFx.classList.contains("is-fav"), false, "初始应为未收藏态");
+  starBtnFx.dispatchEvent(new winFx.MouseEvent("click", { bubbles: true }));
+  assert.ok(winFx.MultiScreen_isFavorite("1001"), "点击五角星必须将该房间加入收藏列表");
+  assert.strictEqual(starBtnFx.classList.contains("is-fav"), true, "收藏后必须切换为高亮态");
+  starBtnFx.dispatchEvent(new winFx.MouseEvent("click", { bubbles: true }));
+  assert.strictEqual(winFx.MultiScreen_isFavorite("1001"), false, "再次点击五角星必须取消收藏");
+  winFx.MultiScreen_toggleFavorite({ rid: "1001", nn: "一号房" });
+  favBtnSrc.dispatchEvent(new winFx.MouseEvent("click", { bubbles: true }));
+  assert.strictEqual(resultsBoxFx.querySelectorAll(".popup-ms__result").length, 1, "点击收藏列表按钮必须独立渲染展示已收藏直播间");
+
+  winFx.PopupPlayer_msRenderResults([], "正在加载关注列表…");
+  winFx.getFollowList = function () { return Promise.resolve({ error: 1 }); };
+  winFx.PopupPlayer_msLoadFollow();
+  await sleep(20);
+  const emptyFx = resultsBoxFx.querySelector(".popup-ms__empty");
+  assert.ok(emptyFx, "关注列表读不到时必须换成空态文本");
+  assert.ok(
+    /读不到关注列表/.test(emptyFx.textContent) && !/正在加载/.test(emptyFx.textContent),
+    "失败后不得停在「正在加载关注列表…」，实际: " + emptyFx.textContent
+  );
+  winFx.close();
+
+  // ---------- 28. 批次1 修复项：坐标越界 / 面板内按下 / 换位后重载 / flv 重建 / 音量 / 指针丢失 / 掉线看门狗 ----------
+  console.log("--> 28.1 hitTest 矩形钳制（容器外坐标一律 -1）");
+  /* 静态已证实：2 分屏的分区表没有 x 边界、4 分屏连 y 边界都没有 —— 容器外的点击
+     （右侧聊天区、页面留白）会被算成命中某一格，长按 300ms 就把格子拎起来了。 */
+  const win30 = load(makeDom());
+  stubRect(win30.MultiScreen_getContainer(), RECT);
+  const c30 = win30.MultiScreen_getContainer();
+  enterGrid(win30, 4);
+  assert.strictEqual(hit(win30, -0.2, 0.5), -1, "容器左侧外必须 -1（4 分屏原来没有任何边界）");
+  assert.strictEqual(hit(win30, 1.2, 0.25), -1, "容器右侧外必须 -1");
+  assert.strictEqual(hit(win30, 0.3, -0.3), -1, "容器上方外必须 -1");
+  assert.strictEqual(hit(win30, 0.3, 1.3), -1, "容器下方外必须 -1");
+  assert.notStrictEqual(hit(win30, 0.3, 0.3), -1, "容器内仍须照常命中");
+  enterGrid(win30, 2);
+  assert.strictEqual(hit(win30, 1.35, 0.5), -1, "2 分屏右侧聊天区必须 -1（原来会命中位置 1）");
+  assert.strictEqual(hit(win30, -0.1, 0.5), -1, "2 分屏左侧外必须 -1");
+  assert.strictEqual(hit(win30, 0.25, 0.5), 0, "2 分屏容器内仍须命中位置 0");
+
+  console.log("--> 28.2 面板里的长按不得拖起背后的格子");
+  win30.createPopupPlayerPanel();
+  const panel30 = win30.document.querySelector(".popup-player-panel");
+  assert.ok(panel30, "前置：面板已创建");
+  panel30.style.position = "fixed";
+  panel30.style.left = "0px";
+  panel30.style.top = "0px";
+  panel30.style.width = RECT.width + "px";
+  panel30.style.height = RECT.height + "px";
+  const blank30 = win30.document.createElement("div");
+  blank30.className = "popup-ms__blank";
+  panel30.appendChild(blank30);
+  blank30.dispatchEvent(new win30.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  await sleep(350);
+  assert.strictEqual(win30.document.querySelectorAll(".dragging-player").length, 0, "面板内长按不得进入拖拽");
+  assert.strictEqual(c30.querySelector(".ms-slot--placeholder"), null, "面板内长按不得产生占位块");
+  panel30.remove();
+
+  console.log("--> 28.6 拖拽中丢失指针必须收尾（否则 applyLayout 永久早退、版面冻结）");
+  enterGrid(win30, 2);
+  c30.dispatchEvent(new win30.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  await sleep(350);
+  assert.strictEqual(win30.document.querySelectorAll(".dragging-player").length, 1, "前置：已进入拖拽");
+  win30.dispatchEvent(new win30.Event("blur"));
+  assert.strictEqual(win30.document.querySelectorAll(".dragging-player").length, 0, "窗口失焦必须取消拖拽");
+  assert.strictEqual(c30.classList.contains("is-dragging"), false, "窗口失焦后容器必须摘掉 is-dragging");
+  assert.strictEqual(c30.querySelector(".ms-slot--placeholder"), null, "窗口失焦后占位块必须清掉");
+  assert.strictEqual(win30.MultiScreen_slots()[0].style.left, "0%", "窗口失焦后版面必须立刻重算（说明 applyLayout 没被冻住）");
+  c30.dispatchEvent(new win30.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  await sleep(350);
+  assert.strictEqual(win30.document.querySelectorAll(".dragging-player").length, 1, "前置：再次进入拖拽");
+  win30.document.dispatchEvent(new win30.Event("mouseleave"));
+  assert.strictEqual(win30.document.querySelectorAll(".dragging-player").length, 0, "指针离开文档必须取消拖拽");
+  win30.close();
+
+  console.log("--> 28.3 换位后「重新加载」只作用于自己这一格");
+  const win31 = load(makeDom());
+  stubRect(win31.MultiScreen_getContainer(), RECT);
+  const c31 = win31.MultiScreen_getContainer();
+  const fetched31 = [];
+  win31.getRealLive_Douyu = function (rid, v, https, qn, cb) { fetched31.push(String(rid)); cb("https://example.com/a.flv"); };
+  win31.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  enterGrid(win31, 3);
+  // 3 分屏右列上下两格互换（位置 1 ↔ 2）
+  c31.dispatchEvent(new win31.MouseEvent("mousedown", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.3 * RECT.height, bubbles: true }));
+  await sleep(350);
+  c31.dispatchEvent(new win31.MouseEvent("mousemove", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.6 * RECT.height, bubbles: true }));
+  win31.document.dispatchEvent(new win31.MouseEvent("mouseup", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.6 * RECT.height, bubbles: true }));
+  assert.strictEqual(String(win31.MultiScreen_getList()[1].rid), "1002", "前置：位置 1 现在是 1002");
+  assert.strictEqual(String(win31.MultiScreen_getList()[2].rid), "1001", "前置：位置 2 现在是 1001");
+  const slots31 = win31.MultiScreen_slots();
+  const clickedCell31 = slots31[1];                 // 现在坐着 1002 的那一格（按钮是它自己渲染出来的）
+  const otherCell31 = slots31[2];                   // 现在坐着 1001 的那一格
+  const clickedVid31 = clickedCell31.querySelector("video");
+  const otherVid31 = otherCell31.querySelector("video");
+  assert.ok(clickedVid31 && otherVid31, "前置：两格都已有画面");
+  fetched31.length = 0;
+  clickedCell31.querySelector(".ms-slot__reload").dispatchEvent(new win31.MouseEvent("click", { bubbles: true }));
+  assert.deepStrictEqual(fetched31, ["1002"], "重载只能拉这一格现在的房间，实际 " + JSON.stringify(fetched31));
+  assert.strictEqual(otherVid31.isConnected, true, "另一格（1001）的画面绝不能被这次重载牵连重渲染");
+  assert.notStrictEqual(clickedCell31.querySelector("video"), clickedVid31, "被点的那一格必须真的重渲染");
+  win31.close();
+
+  console.log("--> 28.4 同一个 rec 上二次 startFlv 必须先销毁旧实例（8s 超时重试走这条）");
+  const win32 = load(makeDom());
+  stubRect(win32.MultiScreen_getContainer(), RECT);
+  const flv32 = { created: 0, destroyed: 0 };
+  let cb32 = null;
+  win32.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb32 = cb; cb("https://example.com/b.flv"); };
+  win32.flvjs = {
+    isSupported: () => true,
+    createPlayer: () => {
+      flv32.created++;
+      return { attachMediaElement() {}, load() {}, play() {}, destroy() { flv32.destroyed++; } };
+    },
+  };
+  enterGrid(win32, 2);
+  assert.strictEqual(flv32.created, flv32.destroyed + 1, "一个格子只该留一个活实例（created=" + flv32.created + ", destroyed=" + flv32.destroyed + "）");
+  cb32("https://example.com/b.flv");   // 同一 rec / 同一 <video> 上再来一次
+  assert.strictEqual(flv32.created, flv32.destroyed + 1, "二次 startFlv 前必须销毁旧实例（created=" + flv32.created + ", destroyed=" + flv32.destroyed + "）");
+  win32.close();
+
+  console.log("--> 28.5 音量：出画面/换档时按最新值，不被出生值盖回去");
+  const win33 = load(makeDom());
+  stubRect(win33.MultiScreen_getContainer(), RECT);
+  win33.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/c.flv"); };
+  win33.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  enterGrid(win33, 2);
+  const slot33 = win33.MultiScreen_slots()[1];
+  const v33 = slot33.querySelector("video");
+  assert.strictEqual(v33.muted, true, "前置：起播前静音");
+  win33.MultiScreen_setVolume("1001", 0.5);       // 画面还没出（rec.vol 出生值是 0）
+  v33.dispatchEvent(new win33.Event("playing"));  // 出画面
+  assert.strictEqual(v33.volume, 0.5, "出画面必须套上最新音量，而不是出生时的 0（实际 " + v33.volume + "）");
+  assert.strictEqual(v33.muted, false, "音量 > 0 时不能再被盖回静音");
+  // 交叉过渡中：旧流此刻还在出声，也得跟着改
+  Object.defineProperty(v33, "readyState", { value: 4, configurable: true });
+  win33.MultiScreen_switchQuality(1, { rid: "1001", nn: "房间1" });
+  const next33 = slot33.querySelector("video.ms-slot__video--next");
+  assert.ok(next33, "前置：换档已叠新流");
+  win33.MultiScreen_setVolume("1001", 0.8);
+  assert.strictEqual(v33.volume, 0.8, "换档期间旧流也必须跟着改音量（实际 " + v33.volume + "）");
+  win33.close();
+
+  console.log("--> 28.7 掉线看门狗：还在播但画面不动了必须给提示，缓过来要撤掉");
+  const win34 = load(makeDom());
+  stubRect(win34.MultiScreen_getContainer(), RECT);
+  win34.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/d.flv"); };
+  win34.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win34.MultiScreen_setStallTimings(40, 120);     // 2s / 6s 压到 40ms / 120ms（自检专用）
+  enterGrid(win34, 2);
+  const slot34 = win34.MultiScreen_slots()[1];
+  const v34 = slot34.querySelector("video");
+  Object.defineProperty(v34, "readyState", { value: 4, configurable: true });
+  Object.defineProperty(v34, "paused", { value: false, configurable: true });
+  v34.dispatchEvent(new win34.Event("playing"));
+  await sleep(400);
+  assert.ok(slot34.classList.contains("ms-slot--notice"), "6 秒无 timeupdate 必须切到提示态");
+  assert.ok(/画面卡住了/.test(slot34.textContent), "文案必须是「画面卡住了，点重新加载」，实际：" + slot34.textContent);
+  assert.strictEqual(slot34.querySelector(".ms-slot__reload").classList.contains("is-visible"), true, "提示态必须让「重新加载」立刻可点");
+  v34.dispatchEvent(new win34.Event("timeupdate"));   // 画面自己缓过来
+  assert.strictEqual(slot34.classList.contains("ms-slot--notice"), false, "画面恢复后必须撤掉提示（否则文案一直盖着）");
+  win34.close();
+
+  console.log("--> 28.9 换位发生在 betard 回包之前：不能把这一格永远留在转圈上");
+  /* resolveRoom 的回包以前按"渲染时的位置"比对记录，换位后整条回包被丢弃 ——
+     那一格既没取流、也没有超时兜底（超时是 startFlv 里才建的），永远停在"努力加载中…"。 */
+  const win35 = load(makeDom());
+  stubRect(win35.MultiScreen_getContainer(), RECT);
+  const c35 = win35.MultiScreen_getContainer();
+  let releaseBetard = null;
+  win35.fetch = function () {
+    return new Promise(function (resolve) {
+      releaseBetard = function () {
+        resolve({ json: async function () { return { room: { nickname: "外房甲" } }; } });
+      };
+    });
+  };
+  const got35 = [];
+  win35.getRealLive_Douyu = function (rid, v, https, qn, cb) { got35.push(String(rid)); cb("https://example.com/e.flv"); };
+  win35.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win35.MultiScreen_enter([{ rid: "1001" }]);            // 外房没有 nn → 走 betard（不缓存、必发请求）
+  assert.strictEqual(typeof releaseBetard, "function", "前置：已经在等 betard 回包");
+  assert.strictEqual(got35.length, 0, "前置：回包之前不取流");
+  // 回包还没到就把它换到位置 0（记录跟着位置搬走）
+  c35.dispatchEvent(new win35.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  await sleep(350);
+  c35.dispatchEvent(new win35.MouseEvent("mousemove", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  win35.document.dispatchEvent(new win35.MouseEvent("mouseup", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  releaseBetard();
+  await sleep(50);
+  assert.deepStrictEqual(got35, ["1001"], "换位后 betard 回包仍必须给这个房间取流（实际 " + JSON.stringify(got35) + "）");
+  win35.close();
+
+  console.log("--> 28.10 换位后的延迟回调必须按记录现算位置（看门狗 / 撤提示 / 起播超时重试）");
+  /* 病根：换位（MultiScreen_swapSlotState）只交换 msPosOwner 与 msSlotPlayers，
+     而下面三个延迟闭包还在用"渲染那一刻的 idx"：
+       · 看门狗 interval  —— msSlotPlayers.get(idx) !== rec 恒早退，两格的卡住检测一起死；
+       · timeupdate 撤提示 —— 同样早退，提示再也撤不掉，文案永久压着正常画面；
+       · 起播超时兜底 + 8s 自动重试 —— 早退，这一格从此没有提示也没有重试；
+         就算不早退，MultiScreen_retryOnce(idx, …) / msActiveList[idx] 也会把重试打到别的房间上。
+     这里把 3 分屏右列上下两格（位置 1 ↔ 2）换位，逐条钉住。 */
+  const win36 = load(makeDom());
+  stubRect(win36.MultiScreen_getContainer(), RECT);
+  const c36 = win36.MultiScreen_getContainer();
+  win36.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/g.flv"); };
+  win36.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win36.MultiScreen_setStallTimings(40, 120);   // 2s / 6s 压到 40ms / 120ms（自检专用）
+  enterGrid(win36, 3);
+  const cell36A = cellPos(win36, 1);            // 位置 1：房间 1001
+  const vid36A = cell36A.querySelector("video");
+  assert.ok(vid36A, "前置：位置 1 已经有 <video>");
+  // 起播：看门狗挂到这条记录上（此刻它渲染时所在的位置是 1）
+  Object.defineProperty(vid36A, "readyState", { value: 4, configurable: true });
+  Object.defineProperty(vid36A, "paused", { value: false, configurable: true });
+  vid36A.dispatchEvent(new win36.Event("playing"));
+  // 换位前画面一直在推进（否则"卡住"会在换位之前就触发，测不到换位后的行为）
+  const keepAlive36 = setInterval(() => { vid36A.dispatchEvent(new win36.Event("timeupdate")); }, 25);
+  // 3 分屏右列上下两格互换（位置 1 ↔ 2，与 28.3 同一条拖拽路径）
+  c36.dispatchEvent(new win36.MouseEvent("mousedown", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.3 * RECT.height, bubbles: true }));
+  await sleep(350);
+  c36.dispatchEvent(new win36.MouseEvent("mousemove", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.6 * RECT.height, bubbles: true }));
+  win36.document.dispatchEvent(new win36.MouseEvent("mouseup", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.6 * RECT.height, bubbles: true }));
+  clearInterval(keepAlive36);
+  assert.strictEqual(String(win36.MultiScreen_getList()[1].rid), "1002", "前置：位置 1 现在是 1002");
+  assert.strictEqual(String(win36.MultiScreen_getList()[2].rid), "1001", "前置：位置 2 现在是 1001");
+  assert.strictEqual(cellPos(win36, 2), cell36A, "前置：1001 的格子（连同它的 <video>）整体搬到了位置 2");
+  await sleep(400);                              // 断流 6 秒（已压到 120ms）
+  assert.ok(cellPos(win36, 2).classList.contains("ms-slot--notice"), "换位后这一格断流仍必须切到提示态（早退 = 看门狗永久失效）");
+  assert.ok(/画面卡住了，点「重新加载」/.test(cellPos(win36, 2).textContent), "提示文案必须是「画面卡住了，点「重新加载」」，实际：" + cellPos(win36, 2).textContent);
+  assert.strictEqual(cellPos(win36, 2).querySelector(".ms-slot__reload").classList.contains("is-visible"), true, "提示态必须让「重新加载」立刻可点");
+  assert.strictEqual(cellPos(win36, 1).classList.contains("ms-slot--notice"), false, "提示绝不能被写到渲染时那一格（现在坐着 1002）");
+  vid36A.dispatchEvent(new win36.Event("timeupdate"));   // 画面自己缓过来
+  assert.strictEqual(cellPos(win36, 2).classList.contains("ms-slot--notice"), false, "换位后 timeupdate 仍必须撤掉提示（否则文案永久压着正常画面）");
+  win36.close();
+
+  /* 起播超时兜底：起播 8s 仍没画面 → 自动重试一次 → 重试仍失败才给提示。
+     换位后重试必须取"记录此刻所在那一格的房间"，绝不能按过期位置取房。 */
+  const win37 = load(makeDom());
+  stubRect(win37.MultiScreen_getContainer(), RECT);
+  const c37 = win37.MultiScreen_getContainer();
+  const fetched37 = [];
+  win37.getRealLive_Douyu = function (rid, v, https, qn, cb) { fetched37.push(String(rid)); cb("https://example.com/h.flv"); };
+  win37.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win37.MultiScreen_setStartTimeout(700);        // 起播超时 8s → 700ms（换位动作约 400ms，必须排在它之后）
+  enterGrid(win37, 3);
+  // 让 1002 的格子先"有画面"：它的超时到点就该静默退出，重试只该由 1001 发一次
+  Object.defineProperty(cellPos(win37, 2).querySelector("video"), "readyState", { value: 4, configurable: true });
+  c37.dispatchEvent(new win37.MouseEvent("mousedown", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.3 * RECT.height, bubbles: true }));
+  await sleep(350);
+  c37.dispatchEvent(new win37.MouseEvent("mousemove", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.6 * RECT.height, bubbles: true }));
+  win37.document.dispatchEvent(new win37.MouseEvent("mouseup", { button: 0, clientX: 0.8 * RECT.width, clientY: 0.6 * RECT.height, bubbles: true }));
+  assert.strictEqual(String(win37.MultiScreen_getList()[2].rid), "1001", "前置：1001 的记录已经搬到位置 2");
+  fetched37.length = 0;                          // 只关心换位之后发生的取流
+  // 超时（700ms）→ 自动重试（2s 节拍）→ 重新取流；轮询到取流发生或 3.4s 超时
+  for (let i = 0; i < 34 && fetched37.length === 0; i++) await sleep(100);
+  assert.deepStrictEqual(fetched37, ["1001"], "换位后起播超时仍必须自动重试一次，且重试的是记录此刻所在那一格的房间（1001），实际 " + JSON.stringify(fetched37));
+  win37.close();
+
+  console.log("--> 28.11 换位发生在出画面之前：playing 仍必须清 loading / 补音量 / 启动看门狗");
+  /* 真机 2026-10-26：把主画面格拖到位置 1 之后外房那一格才出画面 —— playing 回调按渲染时的 idx
+     判"记录还在不在"，换位后恒早退：loading 层不清、音量不补、看门狗压根不启动（冻结永远不提示）。 */
+  const win40 = load(makeDom());
+  stubRect(win40.MultiScreen_getContainer(), RECT);
+  const c40 = win40.MultiScreen_getContainer();
+  win40.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/k.flv"); };
+  win40.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  win40.MultiScreen_setStallTimings(40, 120);     // 2s / 6s 压到 40ms / 120ms
+  enterGrid(win40, 2);
+  const extCell40 = cellPos(win40, 1);
+  const extVid40 = extCell40.querySelector("video");
+  win40.MultiScreen_setVolume("1001", 0.5);       // 该房间存的音量：出画面那一刻必须补上
+  // 换位：主画面格拖到位置 1（外房格坐到位置 0）
+  c40.dispatchEvent(new win40.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  await sleep(350);
+  c40.dispatchEvent(new win40.MouseEvent("mousemove", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  win40.document.dispatchEvent(new win40.MouseEvent("mouseup", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  assert.strictEqual(cellPos(win40, 0), extCell40, "前置：外房格换到了位置 0");
+  assert.strictEqual(cellPos(win40, 0).classList.contains("ms-slot--loading"), true, "前置：出画面之前仍是 loading 态");
+  // 真机上起播一律静音（renderSlot 出生即 muted），音量要等出画面才补
+  extVid40.muted = true;
+  extVid40.volume = 0;
+  Object.defineProperty(extVid40, "readyState", { value: 4, configurable: true });
+  Object.defineProperty(extVid40, "paused", { value: false, configurable: true });
+  extVid40.dispatchEvent(new win40.Event("playing"));   // 换位之后才出画面
+  assert.strictEqual(cellPos(win40, 0).classList.contains("ms-slot--loading"), false, "换位后出画面必须照常撤掉 loading 层（早退 = 永远转圈）");
+  assert.strictEqual(extVid40.volume, 0.5, "出画面必须补上该房间存的音量，实际 " + extVid40.volume);
+  assert.strictEqual(extVid40.muted, false, "音量 > 0 时不能再被盖回静音");
+  assert.strictEqual(cellPos(win40, 1).classList.contains("ms-slot--loading"), false, "主画面格绝不能被当成这一格来清 loading");
+  await sleep(400);                               // 6 秒没有 timeupdate（已压到 120ms）
+  assert.ok(cellPos(win40, 0).classList.contains("ms-slot--notice"), "换位后出画面，看门狗必须真的跑起来（冻结要能出提示）");
+  assert.ok(/画面卡住了/.test(cellPos(win40, 0).textContent), "提示文案必须是「画面卡住了」，实际：" + cellPos(win40, 0).textContent);
+  win40.close();
+
+  console.log("--> 28.12 换位发生在取流回包之前：回包必须落在这个房间此刻的位置");
+  /* 取流是网络往返，换位可能就落在 RTT 里。回包按渲染时的 idx 判记录还在不在，
+     换位后整条回包被丢弃 —— 那一格永远停在转圈，连超时兜底都没有（startTimer 在 startFlv 里才建）。
+     这里把两段 RTT 都按住：betard 回包 + getRealLive_Douyu 回包，各自在换位之后才释放。 */
+  const win41 = load(makeDom());
+  stubRect(win41.MultiScreen_getContainer(), RECT);
+  const c41 = win41.MultiScreen_getContainer();
+  let releaseBetard41 = null;
+  win41.fetch = function () {
+    return new Promise(function (resolve) {
+      releaseBetard41 = function () { resolve({ json: async function () { return { room: { nickname: "外房甲" } }; } }); };
+    });
+  };
+  const got41 = [];
+  const attached41 = [];
+  let liveCb41 = null;
+  win41.getRealLive_Douyu = function (rid, v, https, qn, cb) { got41.push(String(rid)); liveCb41 = cb; };
+  win41.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement(el) { attached41.push(el); }, load() {}, play() {}, destroy() {} }) };
+  const drag41 = async function (from, to) {
+    c41.dispatchEvent(new win41.MouseEvent("mousedown", { button: 0, clientX: from * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+    await sleep(350);
+    c41.dispatchEvent(new win41.MouseEvent("mousemove", { button: 0, clientX: to * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+    win41.document.dispatchEvent(new win41.MouseEvent("mouseup", { button: 0, clientX: to * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  };
+  win41.MultiScreen_enter([{ rid: "1001" }]);     // 外房没有 nn → 走 betard（不缓存、必发请求）
+  assert.strictEqual(win41.MultiScreen_getList().length, 2, "前置：两格");
+  assert.strictEqual(typeof releaseBetard41, "function", "前置：已经在等 betard 回包");
+  const extCell41 = cellPos(win41, 1);
+  await drag41(0.25, 0.75);                       // 回包还没到就换位
+  assert.strictEqual(cellPos(win41, 0), extCell41, "前置：外房格换到了位置 0");
+  releaseBetard41();
+  await sleep(60);
+  assert.deepStrictEqual(got41, ["1001"], "betard 回包之后必须给这个房间取流（rid 1001），实际 " + JSON.stringify(got41));
+  assert.strictEqual(typeof liveCb41, "function", "前置：取流回包还没回来");
+  await drag41(0.25, 0.75);                       // 取流回包也没回来就再换回去
+  assert.strictEqual(cellPos(win41, 1), extCell41, "前置：外房格换回了位置 1");
+  liveCb41("https://example.com/l.flv");
+  await sleep(30);
+  assert.strictEqual(attached41.length, 1, "取流回包之后必须真的建播放器（早退 = 永远停在转圈、也没有超时兜底）");
+  assert.strictEqual(attached41[0], cellPos(win41, 1).querySelector("video"), "播放器必须挂在这个房间此刻所在那一格的 <video> 上");
+  win41.close();
+
+  console.log("--> 28.13 换位后换清晰度 / 自动档必须打到真正的非主房（不得假定位置 0 = 主画面）");
+  /* 真机 2026-10-26（主房 593392 + 外房 2158798）：主画面格拖到位置 1 之后在面板选「超清」，
+     角标立刻变超清、画面却没换。病根：setQuality / reapplyAutoQuality 的循环写成 for (let i = 1; …)，
+     等于假定「位置 0 = 主画面」—— 换位后位置 0 上坐的是真正的外房（被跳过），
+     位置 1 上是主画面格（switchQuality → renderSlot 的主房护栏直接早退），于是 UI 说成功、画面没动。 */
+  const win38 = load(makeDom());
+  stubRect(win38.MultiScreen_getContainer(), RECT);
+  const c38 = win38.MultiScreen_getContainer();
+  const fetched38 = [];
+  win38.getRealLive_Douyu = function (rid, v, https, qn, cb) { fetched38.push(String(rid)); cb("https://example.com/i.flv"); };
+  win38.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  enterGrid(win38, 2);                                   // 位置 0 = 主房 9999，位置 1 = 外房 1001
+  const mainCell38 = cellPos(win38, 0);
+  const extCell38 = cellPos(win38, 1);
+  assert.ok(mainCell38.querySelector("#realVideo"), "前置：位置 0 是主画面格");
+  // 主画面格拖到位置 1（外房格坐到位置 0）—— 与真机现场同一条路径
+  c38.dispatchEvent(new win38.MouseEvent("mousedown", { button: 0, clientX: 0.25 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  await sleep(350);
+  c38.dispatchEvent(new win38.MouseEvent("mousemove", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  win38.document.dispatchEvent(new win38.MouseEvent("mouseup", { button: 0, clientX: 0.75 * RECT.width, clientY: 0.5 * RECT.height, bubbles: true }));
+  assert.strictEqual(cellPos(win38, 0), extCell38, "前置：外房格换到了位置 0");
+  assert.strictEqual(cellPos(win38, 1), mainCell38, "前置：主画面格换到了位置 1");
+  assert.strictEqual(String(win38.MultiScreen_getList()[0].rid), "1001", "前置：位置 0 的数据现在是外房 1001");
+  Object.defineProperty(extCell38.querySelector("video"), "readyState", { value: 4, configurable: true });
+  fetched38.length = 0;
+  win38.MultiScreen_setQuality("3");                     // 面板选「超清」
+  assert.deepStrictEqual(fetched38, ["1001"], "换位后换清晰度必须给真正的外房重新取流（1001），实际 " + JSON.stringify(fetched38));
+  assert.ok(cellPos(win38, 0).querySelector("video.ms-slot__video--next"), "外房那一格必须启动交叉过渡（.ms-slot__video--next），不是「什么都没发生」");
+  assert.strictEqual(cellPos(win38, 1).querySelector(".ms-slot__video"), null, "主画面格绝不能被塞进外房内容");
+  assert.strictEqual(cellPos(win38, 1).classList.contains("ms-slot--loading"), false, "主画面格不得进入 loading 态");
+  assert.ok(cellPos(win38, 1).querySelector("#realVideo"), "主画面格里的原生播放器必须原样保留");
+  // 自动档走另一条循环（reapplyAutoQuality，缩放窗口触发）：同样不能假定位置
+  win38.MultiScreen_setQuality("auto");
+  // 把外房格的量测高度压到"流畅"档，制造一次"尺寸变了 → 该换档"
+  stubRect(cellPos(win38, 0), { left: 0, top: 0, width: 400, height: 100, right: 400, bottom: 100 });
+  fetched38.length = 0;
+  win38.MultiScreen_reapplyAutoQuality();
+  assert.deepStrictEqual(fetched38, ["1001"], "自动档重算（缩放窗口走这条）换位后也必须打到外房 1001，实际 " + JSON.stringify(fetched38));
+  win38.close();
+
+  console.log("--> 29.1 存储脏值容错（ExSave_MultiScreen / ExSave_MultiScreenVol 被写坏）");
+  /* 存储是用户可手动改、也会被旧版本写坏的地方：非法档位会被拿去取流，脏 rid 会变成
+     "[object Object]" 请求，脏音量会变成 NaN 直接套到 <video> 上。恢复时必须逐项校验。 */
+  const dirtyDom = makeDom();
+  dirtyDom.window.localStorage.setItem("ExSave_MultiScreen", JSON.stringify({
+    qn: "ULTRA256",
+    list: [
+      { rid: "1001", nn: { x: 1 }, avatar: 5 },
+      { rid: { bad: 1 } },
+      { rid: "" },
+      "junk",
+      null,
+      { rid: 1002, nn: "外房乙" },
+    ],
+  }));
+  dirtyDom.window.localStorage.setItem("ExSave_MultiScreenVol", JSON.stringify({ "1001": "loud", "1002": 2, "1003": 0.5 }));
+  const win42 = load(dirtyDom);
+  assert.strictEqual(win42.MultiScreen_getQuality(), "auto", "非法档位必须回落到自动，不能拿去取流");
+  win42.MultiScreen_enter();                       // 用持久化列表恢复
+  const list42 = win42.MultiScreen_getList();
+  assert.ok(list42.length >= 2, "合法房间仍必须恢复（实际 " + JSON.stringify(list42) + "）");
+  list42.forEach(function (r) {
+    assert.ok(/^\d+$/.test(String(r.rid)), "脏 rid 必须被丢掉，实际 " + JSON.stringify(r));
+    assert.strictEqual(typeof r.nn, "string", "nn 必须是字符串，实际 " + JSON.stringify(r.nn));
+    assert.strictEqual(typeof r.avatar, "string", "avatar 必须是字符串，实际 " + JSON.stringify(r.avatar));
+  });
+  assert.strictEqual(win42.MultiScreen_getVolume("1001", false), 0, "脏音量必须回落到默认静音");
+  assert.strictEqual(win42.MultiScreen_getVolume("1002", false), 0, "越界音量（2）必须丢弃");
+  assert.strictEqual(win42.MultiScreen_getVolume("1003", false), 0.5, "合法音量必须保留");
+  win42.close();
+
+  console.log("--> 29.2 退出同屏 / 删房必须清掉换档对比与定时器（不留 15 秒后自己弹出来的提示）");
+  const win43 = load(makeDom());
+  stubRect(win43.MultiScreen_getContainer(), RECT);
+  win43.getRealLive_Douyu = function () { /* 永不回包：换档对比会一直挂着 */ };
+  win43.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  enterGrid(win43, 3);
+  win43.MultiScreen_setQuality("3");
+  let st43 = win43.MultiScreen_getInternalState();
+  assert.strictEqual(st43.qnCompare, true, "前置：换档对比已挂起");
+  assert.strictEqual(st43.qnCompareTotal, 2, "前置：两个外房都在对比里（实际 " + st43.qnCompareTotal + "）");
+  win43.MultiScreen_exit();
+  st43 = win43.MultiScreen_getInternalState();
+  assert.strictEqual(st43.qnCompare, false, "退出同屏必须清掉换档对比（否则 15s 后还会弹一次「清晰度切换…」）");
+  assert.strictEqual(st43.players, 0, "退出同屏不得留下播放记录");
+  assert.strictEqual(st43.stallTimers, 0, "退出同屏不得留下看门狗 interval");
+  win43.close();
+
+  const win44 = load(makeDom());
+  stubRect(win44.MultiScreen_getContainer(), RECT);
+  win44.getRealLive_Douyu = function () { /* 同上：保持挂起 */ };
+  win44.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  enterGrid(win44, 3);
+  win44.MultiScreen_setQuality("3");
+  win44.MultiScreen_removeRoom("1002");
+  const st44 = win44.MultiScreen_getInternalState();
+  assert.strictEqual(st44.qnCompareTotal, 1, "删掉的房间必须从换档对比里剔除（否则 15s 后报「已确认 1/2」）");
+  win44.close();
+
+  console.log("--> 29.3 播放器被页面重建（SPA 切房）后必须整体收手：记录 / flv / 定时器 / 列表全清");
+  /* 斗鱼是 SPA：换房时整棵播放器 DOM 会被重建，旧容器变成游离节点。旧记录里的 <video> 随之
+     脱离文档，但 flv.js 仍然在拉流（用户看不到任何画面、带宽一直在烧），看门狗 interval 也还在跑。 */
+  const win45 = load(makeDom());
+  stubRect(win45.MultiScreen_getContainer(), RECT);
+  const flv45 = { created: 0, destroyed: 0 };
+  win45.getRealLive_Douyu = function (rid, v, https, qn, cb) { cb("https://example.com/m.flv"); };
+  win45.flvjs = {
+    isSupported: () => true,
+    createPlayer: () => {
+      flv45.created++;
+      return {
+        attachMediaElement() {}, load() {}, play() {},
+        destroy() { flv45.destroyed++; },
+      };
+    },
+  };
+  enterGrid(win45, 3);
+  assert.ok(flv45.created >= 2, "前置：外房都已建过播放器（实际 " + flv45.created + "）");
+  win45.MultiScreen_getContainer().remove();       // 页面切房：整个播放器被换掉
+  await sleep(1800);                               // 巡检 500ms × 连续 3 次（过滤 React 过渡态）
+  const st45 = win45.MultiScreen_getInternalState();
+  assert.strictEqual(st45.players, 0, "播放器重建后不得留下播放记录（flv 会继续偷偷拉流）");
+  assert.strictEqual(st45.stallTimers, 0, "看门狗 interval 必须一并清掉");
+  assert.strictEqual(st45.list, 1, "列表必须退回单屏（只留当前房间这一条），不能半死不活");
+  assert.strictEqual(flv45.created, flv45.destroyed, "已建的 flv 实例必须全部销毁（实际 created=" + flv45.created + " destroyed=" + flv45.destroyed + "）");
+  win45.close();
+
+  console.log("--> 29.4 换档进行中（交叉过渡）自动档不得再插一脚：不重复取流、不毁掉两条流");
+  /* 5 房/缩放抖动时 reapplyAutoQuality 会被反复调用；此刻某格正在交叉过渡（旧流 + --next 新流），
+     再对它 switchQuality 会走"旧流没画面"的兜底分支 → clearSlot 把两条流一起销毁重取。 */
+  const win46 = load(makeDom());
+  stubRect(win46.MultiScreen_getContainer(), RECT);
+  const fetched46 = [];
+  win46.getRealLive_Douyu = function (rid, v, https, qn, cb) { fetched46.push(String(rid)); cb("https://example.com/n.flv"); };
+  win46.flvjs = { isSupported: () => true, createPlayer: () => ({ attachMediaElement() {}, load() {}, play() {}, destroy() {} }) };
+  enterGrid(win46, 2);
+  const cell46 = cellPos(win46, 1);
+  Object.defineProperty(cell46.querySelector("video"), "readyState", { value: 4, configurable: true });
+  stubRect(cell46, { left: 0, top: 0, width: 400, height: 100, right: 400, bottom: 100 });   // 量到"流畅"档，与当前"最高档"不同
+  fetched46.length = 0;
+  win46.MultiScreen_reapplyAutoQuality();
+  assert.strictEqual(fetched46.length, 1, "前置：自动档已触发一次换档（实际 " + fetched46.length + "）");
+  assert.ok(cell46.querySelector("video.ms-slot__video--next"), "前置：交叉过渡已叠上新流");
+  stubRect(cell46, { left: 0, top: 0, width: 400, height: 400, right: 400, bottom: 400 });   // 窗口又抖回去
+  win46.MultiScreen_reapplyAutoQuality();
+  assert.strictEqual(fetched46.length, 1, "换档进行中不得再取一次流（实际 " + fetched46.length + "）");
+  assert.ok(cell46.querySelector("video.ms-slot__video--next"), "换档进行中不得把交叉过渡的两条流清掉重来");
+  win46.close();
+
+  console.log("--> 28.8 源码级护栏（判空 / 看门狗 interval 必须清 / 退出时不假定位置 0 = 主画面）");
+  const msSrcBatch1 = stripMsComments(fs.readFileSync(path.join(__dirname, "../src/packages/PopupPlayer/PopupPlayer_MultiScreen.js"), "utf8"));
+  assert.ok(/if \(reloadEl\) reloadEl\.addEventListener/.test(msSrcBatch1), "「重新加载」绑定必须判空（AGENTS 红线：DOM 操作必须判空）");
+  assert.ok(/clearInterval\(rec\.stallTimer\)/.test(msSrcBatch1), "destroyPlayer 必须清掉看门狗 interval，否则它一直空转并拽着 slot");
+  /* 退出同屏的清理必须遍历**全部位置**：clearSlot 内部已按格子身份（msPosOwner[idx] !== 0）决定
+     要不要清内容，所以从 0 开始循环是安全的；而写成 for (let i = 1; …) 就等于假定「位置 0 = 主画面」，
+     换位后坐在位置 0 的外房会连 <video> 带 flv 实例一起留在隐藏格里继续播（真机 2026-10-26 复现）。 */
+  assert.ok(/for \(let i = 0; i < MS_SLOT_COUNT; i\+\+\) MultiScreen_clearSlot\(i\)/.test(msSrcBatch1), "退出同屏（close 分支）必须从位置 0 开始清格");
+  assert.strictEqual(/for \(let i = 1; i < MS_SLOT_COUNT; i\+\+\) MultiScreen_clearSlot\(i\)/.test(msSrcBatch1), false, "close 分支不得只清 1~4：换位后外房可能正坐在位置 0");
+  /* 回到单屏还必须复位"位置归属"：只清格不复位的话，renderAll 会把位置 0 上的外房格当主画面的位置，
+     在 0×0 隐藏格里给主房间再建一份流（真机 2026-10-26 两次复现：退出后那格仍在播、房名变主房间名）。 */
+  const settleAt = msSrcBatch1.indexOf("function MultiScreen_settleSingleScreen()");
+  assert.ok(settleAt > 0, "回到单屏必须有 MultiScreen_settleSingleScreen（清格 + 位置归属复位）");
+  const settleBody = msSrcBatch1.slice(settleAt, settleAt + 500);
+  assert.ok(settleBody.indexOf("MultiScreen_clearSlot(i)") >= 0, "settle 必须先把当前映射下的每个位置清干净");
+  assert.ok(settleBody.indexOf("MultiScreen_resetPosOwner()") > settleBody.indexOf("MultiScreen_clearSlot(i)"), "settle 必须在清完之后再复位位置归属（否则记录留在旧位置上）");
+  assert.ok(/MultiScreen_settleSingleScreen\(\);\s*\n\s*MultiScreen_applyLayout\(\);/.test(msSrcBatch1), "apply 收尾必须调 settle 并立刻重排");
+
+  dom.window.close();
+  console.log("=== 多屏复刻单元测试 100% 通过 ===");
+}
+
+run().then(() => {
+  /* 断言全过就立刻收工：夹具页会在 window.close() 之后继续丢出定时器/观察器回调，
+     留着 handle 会让 npm test 的链条卡在最后一步（表现为"测试跑完不返回"）。 */
+  process.exit(0);
+}).catch((e) => {
+  console.error("✗ 多屏复刻单元测试失败:", e && e.message);
+  console.error(e && e.stack);
+  process.exit(1);
+});

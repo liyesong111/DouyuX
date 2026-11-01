@@ -1,0 +1,278 @@
+const fs = require("fs");
+const path = require("path");
+const assert = require("assert");
+let JSDOM;
+try {
+    JSDOM = require("jsdom").JSDOM;
+} catch (e) {
+    console.error("[测试] 缺少依赖 jsdom，请先执行：npm install");
+    throw e;
+}
+
+/**
+ * 签到链路 P0 批回归（audit-wave2 P0-1 / P0-2 / P0-3 + 同链 P1-2 / P1-3 / P1-4 / P1-7）。
+ *
+ * 钉住的事项：
+ *  ① 鱼吧签到已整条移除，无残留文件与接线；
+ *  ② 客户端签到不再可能把「开始签到」按钮永久按住 —— 具备 timeout 与兜底；
+ *  ③ 房间签到已整条移除，无残留文件与接线；
+ *  ④ 粉丝家园单房间失败不拖垮整批；非粉丝按跳过计；
+ *  ⑤ executeSignEngine 批次未完成前不得提前宣布「已完成」；
+ *  ⑥ 星推任务诚实汇报结果 + 白名单保护不误取关。
+ *
+ * 复现修复前的红灯：SIGNCHAIN_SRC_DIR 指向 HEAD 快照即可。
+ */
+const SRC_DIR = process.env.SIGNCHAIN_SRC_DIR || path.join(__dirname, "..");
+function readSrc(rel) {
+    const text = fs.readFileSync(path.join(SRC_DIR, rel), "utf8");
+    assert.ok(text.length > 0, "源码读取为空: " + rel);
+    return text;
+}
+
+const EXGUARD_SRC = readSrc("src/require/ExGuard/ExGuard.js");
+const SIGN_SRC = readSrc("src/packages/Sign/Sign.js");
+const FANS_SRC = readSrc("src/packages/Sign/Sign_FansTree.js");
+const STAR_SRC = readSrc("src/packages/Sign/Sign_StarDiscover.js");
+
+/**
+ * 通用沙箱：window / document / localStorage / console / setTimeout / clearTimeout 自动注入，
+ * 其余全局按 extraNames 顺序给值。ExGuard 永远先拼进去（被测代码直接调 ExGuard_xhr 等）。
+ */
+function makeSandbox(sources, extraNames, extraValues, exposeExpr, opts) {
+    opts = opts || {};
+    const dom = new JSDOM("<!DOCTYPE html><html><body></body></html>", { url: "https://www.douyu.com/9999" });
+    const win = dom.window;
+    const warnings = [];
+    const quietConsole = {
+        log: function () {},
+        warn: function () { warnings.push(Array.prototype.join.call(arguments, " ")); },
+        error: function () {}
+    };
+    const names = ["window", "document", "localStorage", "console", "setTimeout", "clearTimeout"].concat(extraNames);
+    assert.strictEqual(names.length, 6 + extraValues.length, "沙箱入参名字与取值数量不一致");
+    const factory = new Function(names.join(","), EXGUARD_SRC + "\n" + sources.join("\n") + "\nreturn (" + exposeExpr + ");");
+    const setT = opts.setTimeout || win.setTimeout.bind(win);
+    const clrT = opts.clearTimeout || win.clearTimeout.bind(win);
+    const api = factory.apply(null, [win, win.document, win.localStorage, quietConsole, setT, clrT].concat(extraValues));
+    return { dom, win, api, warnings };
+}
+
+function tick() {
+    return new Promise(function (resolve) { setTimeout(resolve, 0); });
+}
+
+function makeGm(requests) {
+    return function (req) { requests.push(req); };
+}
+
+function byUrl(requests, part) {
+    return requests.filter(function (r) { return String(r.url || "").indexOf(part) !== -1; });
+}
+
+/* ============ ① 鱼吧签到：功能已整条移除（回归护栏） ============ */
+
+function testYubaSignRemoved() {
+    console.log("=== ① 鱼吧签到：用户已要求移除，功能必须整条移除 ===");
+    const yubaPath = path.join(SRC_DIR, "src/packages/Sign/Sign_Yuba.js");
+    assert.strictEqual(fs.existsSync(yubaPath), false, "Sign_Yuba.js 必须删除");
+    assert.ok(SIGN_SRC.indexOf("signYubaList") === -1, "Sign.js 不得再调用 signYubaList");
+    assert.ok(SIGN_SRC.indexOf("sign_opt_yuba") === -1, "签到面板不得再提供「关注鱼吧签到」勾选项");
+    assert.ok(SIGN_SRC.indexOf("opts.yuba") === -1, "签到引擎不得再有 yuba 分支");
+    console.log("✓ ① 通过: 已移除的鱼吧签到没有残留入口");
+}
+
+
+
+/* ============ ⑤ 客户端签到不再可能永挂 ============ */
+
+async function testClientSignTimeout() {
+    console.log("=== ⑤ 客户端签到：GM 一声不吭也必须走完（按钮不会被永久按住） ===");
+    const logs = [];
+    const longTimers = [];
+    const requests = [];
+    const env = makeSandbox([SIGN_SRC],
+        ["GM_xmlhttpRequest", "showMessage", "dyToken", "getToken", "sleep"],
+        [makeGm(requests), function () {}, "TOKEN", function () { return "TOKEN"; }, function () { return Promise.resolve(); }],
+        "({ engine: executeSignEngine })",
+        {
+            setTimeout: function (fn, ms) {
+                if (Number(ms) >= 5000) { longTimers.push(fn); return -1; }
+                return global.setTimeout(fn, 0);
+            },
+            clearTimeout: function (id) { global.clearTimeout(id); }
+        });
+
+    const opts = { room: false, client: true, yuba: false, fanshome: false, stardiscover: false, points: false, watchpoints: false };
+    const done = env.api.engine(opts, function (m) { logs.push(String(m)); });
+    await tick();
+    assert.strictEqual(requests.length, 1, "应当只发出客户端签到一条请求，实际 " + requests.length);
+    assert.ok(Number(requests[0].timeout) > 0, "请求必须带 GM 自己的 timeout");
+    assert.strictEqual(longTimers.length, 1, "必须再挂一层本地硬上限（ExGuard_withTimeout），实际 " + longTimers.length);
+
+    longTimers[0]();   // 模拟 16 秒到点：旧实现这里会永远不返回
+    const summary = await done;
+    assert.ok(logs.some(function (m) { return m.indexOf("请求失败或超时") !== -1; }), "超时必须如实提示，实际 " + JSON.stringify(logs));
+    assert.ok(logs.some(function (m) { return m.indexOf("签到结束") !== -1 || m.indexOf("执行完毕") !== -1; }), "引擎必须走到底（对应 finally 里的按钮复位），实际 " + JSON.stringify(logs));
+    assert.strictEqual(summary.fail, 1, "超时必须计入失败数，实际 " + JSON.stringify(summary));
+    env.dom.window.close();
+    console.log("✓ ⑤ 通过: 无响应也能落地并提示");
+}
+
+/* ============ ⑥ 房间签到：接口已下线，功能整条移除（回归护栏） ============ */
+
+function testRoomSignRemoved() {
+    console.log("=== ⑥ 房间签到：斗鱼已下线该接口，功能必须整条移除 ===");
+    const roomPath = path.join(SRC_DIR, "src/packages/Sign/Sign_Room.js");
+    assert.strictEqual(fs.existsSync(roomPath), false,
+        "Sign_Room.js 必须删除（/japi/roomuserlevel/apinc/checkIn 已下线，error=8）");
+    assert.ok(SIGN_SRC.indexOf("signAllRoom") === -1, "Sign.js 不得再调用 signAllRoom");
+    assert.ok(SIGN_SRC.indexOf("sign_opt_room") === -1, "签到面板不得再提供「房间与粉丝牌签到」勾选项");
+    assert.ok(SIGN_SRC.indexOf("opts.room") === -1, "签到引擎不得再有 room 分支");
+    console.log("✓ ⑥ 通过: 已下线的房间签到没有残留入口");
+}
+
+/* ============ ⑦ 粉丝家园：单房间失败不拖垮整批 ============ */
+
+async function testFansHomePartialFailure() {
+    console.log("=== ⑦ 粉丝家园：一个房间失败不得让整批停掉 ===");
+    const messages = [];
+    const bodies = [];
+    const fetchStub = function (url, init) {
+        const body = (init && init.body) ? String(init.body) : "";
+        bodies.push(body);
+        if (/(^|&)rid=1$/.test(body)) return Promise.reject(new Error("net::ERR"));
+        return Promise.resolve({ json: function () { return Promise.resolve({ error: 0 }); } });
+    };
+    const env = makeSandbox([FANS_SRC], ["fetch", "showMessage", "myFansBadgeList", "getCCN"],
+        [fetchStub, function (m) { messages.push(String(m)); }, ["1", "2"], function () { return "CCN"; }],
+        "({ run: initPkg_Sign_FansTree })");
+    const res = await env.api.run();
+    assert.strictEqual(bodies.length, 2, "两个房间都要尝试（旧实现第一个失败就整批停），实际 " + bodies.length);
+    assert.deepStrictEqual(res, { ok: 1, fail: 1, skipped: 0 }, "一个失败一个成功，实际 " + JSON.stringify(res));
+    assert.ok(messages.some(function (m) { return m.indexOf("完成 1 个，失败 1 个") !== -1; }), "失败要有汇总提示，实际 " + JSON.stringify(messages));
+    env.dom.window.close();
+
+    // 1006「签到失败，非房间粉丝用户」= 不是故障，必须计跳过（2026-10-30 真机实测口径）
+    const messages2 = [];
+    const env2 = makeSandbox([FANS_SRC], ["fetch", "showMessage", "myFansBadgeList", "getCCN"],
+        [function () { return Promise.resolve({ json: function () { return Promise.resolve({ error: 1006, msg: "签到失败，非房间粉丝用户" }); } }); },
+         function (m) { messages2.push(String(m)); }, ["1", "2"], function () { return "CCN"; }],
+        "({ run: initPkg_Sign_FansTree })");
+    const res2 = await env2.api.run();
+    assert.deepStrictEqual(res2, { ok: 0, fail: 0, skipped: 2 }, "非粉丝必须计入跳过而不是失败，实际 " + JSON.stringify(res2));
+    env2.dom.window.close();
+    console.log("✓ ⑦ 通过: 单房间异常不再拖垮整批；非粉丝按跳过计");
+}
+
+/* ============ ⑧ 一键签到必须真的等到子任务结束 ============ */
+
+async function testEngineAwaitsSubtasks() {
+    console.log("=== ⑧ executeSignEngine：批次没签完就不许宣布「已完成」 ===");
+    const messages = [];
+    const requests = [];
+    const env = makeSandbox([SIGN_SRC],
+        ["GM_xmlhttpRequest", "showMessage", "sleep", "dyToken", "getToken"],
+        [makeGm(requests), function (m) { messages.push(String(m)); }, function () { return Promise.resolve(); }, "TOKEN", function () { return "TOKEN"; }],
+        "({ engine: executeSignEngine })");
+
+    let resolved = null;
+    const opts = { client: true, fanshome: false, stardiscover: false, points: false, watchpoints: false };
+    const p = env.api.engine(opts, function (m) { messages.push(String(m)); }).then(function (r) { resolved = r; return r; });
+
+    await tick();
+    assert.strictEqual(requests.length, 1, "应当发出客户端签到请求");
+    assert.strictEqual(resolved, null, "客户端请求未落地前，引擎不能提前宣布完成");
+
+    requests[0].onload({ response: { data: { sign_pl: [{ cnt: 1, name: "礼盒" }] } } });
+    await tick();
+    await p;
+
+    assert.ok(resolved, "批次结束后引擎必须返回汇总");
+    assert.strictEqual(resolved.ok, 1, "成功 1 个，实际 " + JSON.stringify(resolved));
+    assert.strictEqual(resolved.fail, 0, "不该有失败项，实际 " + JSON.stringify(resolved));
+    assert.ok(messages.some(function (m) { return m.indexOf("所有已选签到任务执行完毕") !== -1; }), "全成功时才允许说「执行完毕」，实际 " + JSON.stringify(messages));
+    env.dom.window.close();
+    console.log("✓ ⑧ 通过: 引擎等到了真实批次结果");
+}
+
+/* ============ ⑨ 星推：诚实汇报 + 只取关自己关注过的 ============ */
+
+function starRoutes(mode, calls) {
+    return function (url, init) {
+        const u = String(url);
+        calls.push(u + " " + ((init && init.body) ? String(init.body) : ""));
+        const json = function (payload) {
+            return Promise.resolve({ json: function () { return Promise.resolve(payload); } });
+        };
+        if (u.indexOf("task/report") !== -1) return json({ error: 500, msg: "活动未开始" });
+        if (u.indexOf("rank/info") !== -1) return json({ data: { rankItemList: [{ rid: "111" }] } });
+        if (u.indexOf("task/list") !== -1) return json({ data: { taskList: [{ type: 4, curCompleteNum: 0 }] } });
+        if (u.indexOf("follow/add") !== -1) return json(mode === "already" ? { error: 1, msg: "已关注" } : { error: 0 });
+        if (u.indexOf("follow/rm") !== -1) return json({ error: -1, msg: "风控拦截" });
+        if (u.indexOf("follow/list") !== -1) return json({ data: { list: [] } });
+        if (u.indexOf("introduce") !== -1) return json({ data: { list: [] } });
+        return json({});
+    };
+}
+
+async function testStarDiscoverHonest() {
+    console.log("=== ⑨ 星推任务：失败要说失败；取关失败进待办；已关注的不许取关 ===");
+
+    // ① 关键步骤全失败 + 取关被风控
+    const messages = [];
+    const calls = [];
+    const env = makeSandbox([STAR_SRC], ["fetch", "getDouyuCtn", "sleep", "showMessage", "rid"],
+        [starRoutes("new", calls), function () { return Promise.resolve("CTN"); }, function () { return Promise.resolve(); },
+         function (m) { messages.push(String(m)); }, "9999"],
+        "({ run: executeStarDiscoverSign })");
+    const res = (await env.api.run(function (m) { messages.push(String(m)); })) || {};
+
+    // 先看文案：旧实现无论成败都宣布「已全部执行完毕」
+    assert.ok(!messages.some(function (m) { return m.indexOf("已全部执行完毕") !== -1; }), "失败时不许宣布全部完成，实际 " + JSON.stringify(messages));
+    assert.ok(messages.some(function (m) { return m.indexOf("未成功") !== -1; }), "失败要有明确措辞，实际 " + JSON.stringify(messages));
+    assert.ok(res.fail > 0, "有失败步骤时 fail 必须 > 0，实际 " + JSON.stringify(res));
+
+    const pending = JSON.parse(env.win.localStorage.getItem("ExSave_StarFollowPending") || "[]");
+    assert.deepStrictEqual(pending, ["111"], "取关失败的主播必须留在待办清单，实际 " + JSON.stringify(pending));
+    assert.ok(env.warnings.some(function (w) { return w.indexOf("待办") !== -1; }), "取关失败要留痕，实际 " + JSON.stringify(env.warnings));
+    env.dom.window.close();
+
+    // ② 白名单保护：add 返回「已关注」时绝不能出现在待办里，更不能发取关请求
+    const messages2 = [];
+    const calls2 = [];
+    const env2 = makeSandbox([STAR_SRC], ["fetch", "getDouyuCtn", "sleep", "showMessage", "rid"],
+        [starRoutes("already", calls2), function () { return Promise.resolve("CTN"); }, function () { return Promise.resolve(); },
+         function (m) { messages2.push(String(m)); }, "9999"],
+        "({ run: executeStarDiscoverSign })");
+    await env2.api.run(function (m) { messages2.push(String(m)); });
+    const rmCalls = calls2.filter(function (c) { return c.indexOf("follow/rm") !== -1; });
+    assert.strictEqual(rmCalls.length, 0, "用户已关注的主播绝不能被取关，实际 " + JSON.stringify(rmCalls));
+    const pending2 = JSON.parse(env2.win.localStorage.getItem("ExSave_StarFollowPending") || "[]");
+    assert.deepStrictEqual(pending2, [], "已关注的主播不产生待办，实际 " + JSON.stringify(pending2));
+    env2.dom.window.close();
+    console.log("✓ ⑨ 通过: 诚实汇报 + 待办留痕 + 白名单保护");
+}
+// 只在复现红灯时用：SIGNCHAIN_ONLY=鱼吧 / 客户端 / 房间 / 粉丝家园 之类，可单独跑一组场景
+const ONLY = process.env.SIGNCHAIN_ONLY || "";
+const SCENARIOS = [
+    ["鱼吧已移除", testYubaSignRemoved],
+    ["客户端", testClientSignTimeout],
+    ["房间已下线", testRoomSignRemoved],
+    ["粉丝家园", testFansHomePartialFailure],
+    ["引擎等待", testEngineAwaitsSubtasks],
+    ["星推诚实", testStarDiscoverHonest]
+];
+
+(async function main() {
+    let ran = 0;
+    for (let i = 0; i < SCENARIOS.length; i++) {
+        if (ONLY && SCENARIOS[i][0].indexOf(ONLY) === -1) continue;
+        await SCENARIOS[i][1]();
+        ran++;
+    }
+    assert.ok(ran > 0, "SIGNCHAIN_ONLY 没有匹配到任何场景: " + ONLY);
+    console.log("=== 签到链路（P0 批 + P1 收尾）回归测试" + (ONLY ? "（仅 " + ONLY + "）" : "") + " 100% 通过 ===");
+})().catch(function (e) {
+    console.error("测试失败:", e && e.stack ? e.stack : e);
+    process.exit(1);
+});
