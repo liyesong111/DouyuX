@@ -317,8 +317,8 @@ function testLotteryRemoved() {
     const commonSrc = read("src/common.js");
     assert.ok(commonSrc.indexOf("全站抽奖信息") === -1, "common.js 不得再包含「全站抽奖信息」");
     assert.ok(commonSrc.indexOf("exlottery") === -1, "common.js 不得再包含 exlottery 类名");
-    const panelSrc = read("src/packages/ExPanel/ExPanel.js");
-    assert.ok(panelSrc.indexOf("exlottery") === -1, "ExPanel.js 不得再包含 exlottery");
+    const panelSrc = read("src/packages/XPanel/XPanel.js");
+    assert.ok(panelSrc.indexOf("exlottery") === -1, "XPanel.js 不得再包含 exlottery");
     console.log("✓ 场景 5 通过: 全站抽奖信息已整条移除，无残留文件与接线");
 }
 

@@ -36,7 +36,7 @@
 
 ## 四、编码红线（不会被自动拦、全靠人守）
 
-- `380px` / `370px` 在全产物中只能各出现一次；包级 CSS 不得定义那 8 个三级面板类名；UI 改动归口 `ExPanel.css`。
+- `380px` / `370px` 在全产物中只能各出现一次；包级 CSS 不得定义那 8 个三级面板类名；UI 改动归口 `XPanel.css`（原 `ExPanel.css`）。
 - 新存储键必须 `ExSave_` 前缀。
 - **新包必须在 `src/main.js` 的 `initPkg()` 里接线**，否则被 tree-shaking 静默删掉（不报错）。
 - 所有 DOM 操作（insertBefore / appendChild / addEventListener）必须具备安全判空或回退兜底。

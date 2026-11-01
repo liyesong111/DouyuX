@@ -1263,7 +1263,7 @@ function testChatMemoryRebindAfterRoomSwitch() {
 /* 场景 19: ExPanel 自愈巡检的节流与归位（P1-9）                        */
 /* ------------------------------------------------------------------ */
 
-const EXPANEL_SRC = read("src/packages/ExPanel/ExPanel.js");
+const EXPANEL_SRC = read("src/packages/XPanel/XPanel.js");
 
 function loadExPanel() {
     const dom = makeDom("<!DOCTYPE html><html><body>" +

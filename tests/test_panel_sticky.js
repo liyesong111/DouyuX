@@ -34,7 +34,7 @@ function readSrc(rel) {
 // 加载顺序与构建脚本一致：公共函数 → 面板外壳（ensureMiuixPanelHeader）→ 更新日志数据 → 各面板包
 const SOURCES = [
   "src/common.js",
-  "src/packages/ExPanel/ExPanel.js",
+  "src/packages/XPanel/XPanel.js",
   "src/packages/Update/UpdateLog.js",
   "src/packages/Sign/Sign.js",
   "src/packages/FansContinue/FansContinue.js",
@@ -106,10 +106,10 @@ function makeWin() {
     if (typeof cb === "function") cb({ data: { list: [] } });
   };
 
-  /* 共用样式表也注入：真实面板的 .action-wrap 规则来自 ExPanel.css，
+  /* 共用样式表也注入：真实面板的 .action-wrap 规则来自 XPanel.css，
      否则「背景为空」只是因为裸 DOM 里根本没有样式可选，断言就失去意义。 */
   const styleEl = win.document.createElement("style");
-  styleEl.textContent = readSrc("src/packages/ExPanel/ExPanel.css");
+  styleEl.textContent = readSrc("src/packages/XPanel/XPanel.css");
   win.document.head.appendChild(styleEl);
 
   SOURCES.forEach(function (rel) {

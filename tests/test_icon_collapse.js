@@ -5,7 +5,7 @@ let JSDOM;
 try { JSDOM = require("jsdom").JSDOM; } catch (e) { console.error("[测试] 缺少依赖 jsdom，请先执行：npm install"); throw e; }
 
 const ROOT = path.join(__dirname, "..");
-const EXPANEL_SRC = fs.readFileSync(path.join(ROOT, "src/packages/ExPanel/ExPanel.js"), "utf8");
+const EXPANEL_SRC = fs.readFileSync(path.join(ROOT, "src/packages/XPanel/XPanel.js"), "utf8");
 const EXICON_SRC = fs.readFileSync(path.join(ROOT, "src/packages/ExIcon/ExIcon.js"), "utf8");
 const EXICON_FN_SRC = EXICON_SRC.slice(EXICON_SRC.indexOf("function initPkg_ExIcon_Func()"));
 

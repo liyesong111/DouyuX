@@ -9,7 +9,7 @@ try {
     throw e;
 }
 
-const EXPANEL_SRC = fs.readFileSync(path.join(__dirname, "../src/packages/ExPanel/ExPanel.js"), "utf8");
+const EXPANEL_SRC = fs.readFileSync(path.join(__dirname, "../src/packages/XPanel/XPanel.js"), "utf8");
 
 /**
  * 工具条（Dock）自愈回归。

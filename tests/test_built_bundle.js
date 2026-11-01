@@ -662,13 +662,13 @@ async function testBuiltBundle() {
         });
     });
     const offenders = packageCssFiles.filter(({ pkg, file }) => {
-        if (pkg === "ExPanel") return false; // 统一引擎本体
+        if (pkg === "XPanel" || pkg === "ExPanel") return false; // 统一引擎本体
         return PANEL_SELECTOR.test(fs.readFileSync(file, "utf8"));
     });
     assert.strictEqual(
         offenders.length,
         0,
-        `包级 CSS 不得定义三级面板选择器（应全部上收 ExPanel.css），违规文件: ` +
+        `包级 CSS 不得定义三级面板选择器（应全部上收 XPanel.css），违规文件: ` +
             offenders.map((o) => o.pkg + "/" + path.basename(o.file)).join(" | ")
     );
     console.log(`✓ 测试场景 14 通过: 模态尺寸唯一声明，${packageCssFiles.length} 个包级 CSS 无一越权定义三级面板选择器`);

@@ -62,7 +62,7 @@ function isAnyThirdLevelPanelOpen() {
   return false;
 }
 
-function initPkg_ExPanel() {
+function initPkg_XPanel() {
   initPkg_ExPanel_insertDom();
 
   // 二级菜单生命周期完全由用户驱动：仅「点击精灵球」展开、「点击 ×」或「点菜单外面」关闭，
@@ -81,6 +81,8 @@ function initPkg_ExPanel() {
   ExPanel_startSelfHeal();
   ExPanel_bindClickOutside();
 }
+var initPkg_ExPanel = initPkg_XPanel;
+var initPkg_XPanel_insertDom = initPkg_ExPanel_insertDom;
 
 /* ==================== 点击菜单外部自动关闭 ==================== */
 /* 用 var 不用 let：产物是「所有包拼进同一个作用域」的一份脚本，任何人都可能在声明语句执行前
@@ -679,14 +681,23 @@ function openMiuixPanelCentered(panel, btnEl) {
 
 window.ensureMiuixPanelHeader = ensureMiuixPanelHeader;
 window.openMiuixPanelCentered = openMiuixPanelCentered;
+window.openXPanel = openExPanel;
 window.openExPanel = openExPanel;
+window.XPanel_closeAllThirdLevel = ExPanel_closeAllThirdLevel;
 window.ExPanel_closeAllThirdLevel = ExPanel_closeAllThirdLevel;
+window.XPanel_closeAllMenus = ExPanel_closeAllMenus;
 window.ExPanel_closeAllMenus = ExPanel_closeAllMenus;
+window.XPanel_isInsideMenu = ExPanel_isInsideMenu;
 window.ExPanel_isInsideMenu = ExPanel_isInsideMenu;
+window.XPanel_markMenuLayer = ExPanel_markMenuLayer;
 window.ExPanel_markMenuLayer = ExPanel_markMenuLayer;
+window.XPanel_bindClickOutside = ExPanel_bindClickOutside;
 window.ExPanel_bindClickOutside = ExPanel_bindClickOutside;
 window.isAnyThirdLevelPanelOpen = isAnyThirdLevelPanelOpen;
+window.hideXPanel = hideExPanel;
 window.hideExPanel = hideExPanel;
+window.toggleXPanel = toggleExPanel;
 window.toggleExPanel = toggleExPanel;
+window.showXPanel = showExPanel;
 window.showExPanel = showExPanel;
 window.updateDockActiveIndicator = updateDockActiveIndicator;

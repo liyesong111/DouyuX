@@ -13,8 +13,8 @@ const ROOT = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const EXPANDTOOL_SRC = read("src/packages/ExpandTool/ExpandTool.js");
 const ONLINETOOL_SRC = read("src/packages/OnlineTool/OnlineTool.js");
-const EXPANEL_SRC = read("src/packages/ExPanel/ExPanel.js");
-const EXPANEL_CSS = read("src/packages/ExPanel/ExPanel.css");
+const EXPANEL_SRC = read("src/packages/XPanel/XPanel.js");
+const EXPANEL_CSS = read("src/packages/XPanel/XPanel.css");
 const POPUPPLAYER_SRC = read("src/packages/PopupPlayer/PopupPlayer.js");
 
 function stripComments(src) {

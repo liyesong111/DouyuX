@@ -11,8 +11,8 @@ try {
 
 const SRC_PATH = path.join(__dirname, "../src/packages/DanmakuHistory/DanmakuHistory.js");
 const COMMON_PATH = path.join(__dirname, "../src/common.js");
-const EXPANEL_PATH = path.join(__dirname, "../src/packages/ExPanel/ExPanel.js");
-const EXPANEL_CSS_PATH = path.join(__dirname, "../src/packages/ExPanel/ExPanel.css");
+const EXPANEL_PATH = path.join(__dirname, "../src/packages/XPanel/XPanel.js");
+const EXPANEL_CSS_PATH = path.join(__dirname, "../src/packages/XPanel/XPanel.css");
 const MAIN_PATH = path.join(__dirname, "../src/main.js");
 
 /**
