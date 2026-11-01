@@ -3129,7 +3129,7 @@ input[type="checkbox"].sign-checkbox:checked:active::before {
     left: 50% !important;
     transform: translate(-50%, -50%) scale(0.96) !important;
     width: min(960px, 92vw) !important;
-    height: min(680px, 86vh) !important;
+    height: min(880px, 94vh) !important;
     background: linear-gradient(150deg, rgba(28, 30, 35, 0.98), rgba(18, 19, 22, 0.99)) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
     border-radius: 14px !important;

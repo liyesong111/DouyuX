@@ -188,11 +188,14 @@ function requestVersionSource(url, onDone) {
     onDone(text);
   };
 
+  const reqUrl = url + (url.indexOf("?") !== -1 ? "&" : "?") + "_t=" + Date.now();
+
   if (typeof GM_xmlhttpRequest === "function") {
     GM_xmlhttpRequest({
       method: "GET",
-      url: url,
+      url: reqUrl,
       timeout: UPDATE_VERSION_TIMEOUT,
+      headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
       onload: function (res) {
         if (res && res.status === 200) {
           done(res.responseText || res.response || "");
@@ -205,7 +208,7 @@ function requestVersionSource(url, onDone) {
       onabort: function () { done(null); }
     });
   } else {
-    fetch(url, { cache: "no-store" })
+    fetch(reqUrl, { cache: "no-store" })
       .then(function (res) { return res && res.ok ? res.text() : null; })
       .then(function (text) { done(text); })
       .catch(function () { done(null); });

@@ -121,7 +121,7 @@ function createLvjiangModal() {
   var refreshBtn = modal.querySelector(".lvjiang-modal__refresh-btn");
   if (refreshBtn) {
     refreshBtn.addEventListener("click", function () {
-      loadLvjiangContent(currentLvjiangKey);
+      loadLvjiangContent(currentLvjiangKey, true);
     });
   }
 
@@ -164,7 +164,7 @@ function switchLvjiangTab(key) {
   loadLvjiangContent(key);
 }
 
-function loadLvjiangContent(key) {
+function loadLvjiangContent(key, forceReload) {
   var modal = document.querySelector(".lvjiang-modal");
   if (!modal) return;
 
@@ -202,7 +202,11 @@ function loadLvjiangContent(key) {
   };
 
   // 直接设置 iframe.src 加载原站（xinlvjiang.icu 声明了 frame-ancestors *，可跨域安全内嵌且脚本运行正常）
-  if (iframe.src !== targetUrl) {
+  if (forceReload) {
+    iframe.removeAttribute("srcdoc");
+    var sep = targetUrl.indexOf("?") !== -1 ? "&" : "?";
+    iframe.src = targetUrl + sep + "_t=" + Date.now();
+  } else if (!iframe.src || iframe.src.indexOf(targetUrl) === -1) {
     iframe.removeAttribute("srcdoc");
     iframe.src = targetUrl;
   } else {

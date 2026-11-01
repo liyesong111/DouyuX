@@ -1,6 +1,6 @@
 {
   "name": "DouyuX",
-  "version": "2026.10.31.02",
+  "version": "2026.11.01.01",
   "description": "DouyuX-斗鱼直播间增强(驴酱版)",
   "scripts": {
     "build": "node build.js",
