@@ -254,31 +254,22 @@ function fetchLatestVersion(callback) {
 
 /* ==================== 版本更新日志渲染层（数据源：UpdateLog.js） ==================== */
 
-// 取指定版本的更新日志；缺失时回退到最新一条，保证面板永不空白
+// 取功能说明数据源（固定展示核心特性说明）
 function getExUpdateLogFor(version) {
   var log = (typeof EX_UPDATE_LOG !== "undefined" && EX_UPDATE_LOG) ? EX_UPDATE_LOG : null;
   if (!log) return null;
-  if (log[version]) return log[version];
+  if (log["features"]) return log["features"];
+  if (version && log[version]) return log[version];
 
   var keys = Object.keys(log);
   if (keys.length === 0) return null;
-  keys.sort(function (a, b) {
-    var pa = String(a).split(".").map(Number);
-    var pb = String(b).split(".").map(Number);
-    for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
-      var x = pa[i] || 0;
-      var y = pb[i] || 0;
-      if (x !== y) return x - y;
-    }
-    return 0;
-  });
-  return log[keys[keys.length - 1]];
+  return log[keys[0]];
 }
 
 function getExUpdateLogSections() {
   return (typeof EX_UPDATE_LOG_SECTIONS !== "undefined" && Array.isArray(EX_UPDATE_LOG_SECTIONS))
     ? EX_UPDATE_LOG_SECTIONS
-    : ["新增功能", "改进与修复", "其它"];
+    : ["同屏播放", "驴酱杯赛程", "弹幕发送"];
 }
 
 function escapeUpdateLogText(str) {
@@ -286,20 +277,13 @@ function escapeUpdateLogText(str) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// 依据数据源渲染三大板块卡片，条目统一为 "• 【分类】说明" 格式
+// 依据数据源渲染三大核心功能卡片（同屏播放、驴酱杯赛程、弹幕发送）
 function buildExUpdateCardsHtml() {
   var entry = getExUpdateLogFor(curVersion);
   var sections = getExUpdateLogSections();
   if (!entry) return "";
 
-  // 当前版本没有独立条目时会回退到「最新一条」：必须如实标注，不能冒充本版本日志（audit-wave3 W11）
-  var log = (typeof EX_UPDATE_LOG !== "undefined" && EX_UPDATE_LOG) ? EX_UPDATE_LOG : null;
-  var isFallback = !(log && log[curVersion]);
-  var note = isFallback
-    ? '<div class="exupdate-panel__note">当前版本 ' + escapeUpdateLogText(curVersion) + ' 暂无独立日志条目，以下为最近一条更新日志。</div>'
-    : "";
-
-  return note + sections.map(function (name) {
+  return sections.map(function (name) {
     var items = Array.isArray(entry[name]) ? entry[name] : [];
     var lis = items.map(function (text) {
       return "<li>• " + escapeUpdateLogText(text) + "</li>";

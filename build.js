@@ -97,15 +97,15 @@ function verifyUpdateLog(version) {
     process.exit(1);
   }
 
-  const entry = log[version];
+  const entry = log["features"] || log[version];
   if (!entry) {
-    console.error(`[Verify] 版本更新日志缺少当前版本 ${version} 的条目，请先在 UpdateLog.js 中补充`);
+    console.error(`[Verify] 更新说明数据源缺少固定说明条目 (features)，请先在 UpdateLog.js 中配置`);
     process.exit(1);
   }
 
   const unknown = Object.keys(entry).filter((k) => sections.indexOf(k) === -1);
   if (unknown.length > 0) {
-    console.error(`[Verify] 版本 ${version} 存在未声明的板块: ${unknown.join("、")}`);
+    console.error(`[Verify] 更新说明存在未声明的板块: ${unknown.join("、")}`);
     process.exit(1);
   }
 
@@ -113,14 +113,14 @@ function verifyUpdateLog(version) {
   sections.forEach((name) => {
     const items = entry[name];
     if (!Array.isArray(items) || items.length === 0) {
-      console.error(`[Verify] 版本 ${version} 的板块【${name}】缺失或为空，不允许留空占位`);
+      console.error(`[Verify] 更新说明板块【${name}】缺失或为空，不允许留空占位`);
       process.exit(1);
     }
     items.forEach((item, idx) => {
       const text = typeof item === "string" ? item.trim() : "";
       if (!/^【[^】]+】.+/.test(text)) {
         console.error(
-          `[Verify] 版本 ${version} 板块【${name}】第 ${idx + 1} 条格式不合规（必须以 【分类】 开头且有说明文字）: ${JSON.stringify(item)}`
+          `[Verify] 更新说明板块【${name}】第 ${idx + 1} 条格式不合规（必须以 【分类】 开头且有说明文字）: ${JSON.stringify(item)}`
         );
         process.exit(1);
       }
@@ -128,7 +128,7 @@ function verifyUpdateLog(version) {
     total += items.length;
   });
 
-  console.log(`[Verify] 版本更新日志校验通过 (版本 ${version}，${sections.length} 大板块，共 ${total} 条)`);
+  console.log(`[Verify] 更新功能说明校验通过 (共 ${sections.length} 大核心板块，${total} 条特性说明)`);
 }
 
 function treeShakeOnce(code) {

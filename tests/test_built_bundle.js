@@ -335,8 +335,8 @@ async function testBuiltBundle() {
     const titles = Array.from(cards).map(c => c.querySelector(".exupdate-panel__card-title")?.textContent.trim());
     assert.deepStrictEqual(
         titles,
-        ["新增功能", "改进与修复", "其它"],
-        "三大板块标题必须严格为 新增功能 / 改进与修复 / 其它（不带尾部点缀符），且顺序固定"
+        ["同屏播放", "驴酱杯赛程", "弹幕发送"],
+        "三大板块标题必须严格为 同屏播放 / 驴酱杯赛程 / 弹幕发送（不带尾部点缀符），且顺序固定"
     );
 
     // 每个条目必须严格为 "• 【分类】说明" 格式，且三大板块均不得为空

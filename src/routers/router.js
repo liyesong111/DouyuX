@@ -250,8 +250,8 @@ function initRouter_Xinlvjiang() {
             "::-webkit-scrollbar-thumb:hover {",
             "    background: rgba(255, 102, 0, 0.65) !important;",
             "}",
-            "/* 隐藏原站顶栏与全屏装饰，让 iframe 内部空间全部服务于赛事内容 */",
-            ".site-header,",
+            "/* 战队阵容页隐藏原站冗余顶栏与装饰，让大视野服务于战队与选手内容 */",
+            ".teams-page .site-header,",
             ".site-scenery,",
             ".navigation-progress,",
             ".skip-link {",
@@ -482,6 +482,15 @@ function initRouter_Xinlvjiang() {
         if (interactionsBound) return;
         interactionsBound = true;
 
+        function getCleanSearch() {
+            try {
+                var search = window.location.search || "";
+                return search.replace(/[?&]_t=\d+/g, "").replace(/^\?&/, "?");
+            } catch (_) {
+                return window.location.search || "";
+            }
+        }
+
         function safeNavigate(url) {
             if (!url) return;
             url = String(url).replace(/&amp;/g, "&");
@@ -489,24 +498,64 @@ function initRouter_Xinlvjiang() {
                 window.__TEST_NAVIGATE__(url);
                 return;
             }
+
+            var targetFullUrl = "";
+            try {
+                targetFullUrl = new URL(url, window.location.origin).href;
+            } catch (_) {
+                targetFullUrl = url;
+            }
+
+            // 1. 若当前快览模态框处于 open 状态，先关闭以解除模态事件循环锁
+            try {
+                var d = document.querySelector("dialog.profile-preview-dialog, [data-profile-dialog]");
+                if (d && typeof d.close === "function" && d.open) {
+                    d.close();
+                }
+            } catch (_) {}
+
+            // 2. 向父页面（斗鱼）派发新路由通知，保持外部“新标签页打开”按钮与 URL 状态同步
+            if (window.parent && window.parent !== window) {
+                try {
+                    window.parent.postMessage({
+                        type: "lvjiang_url_change",
+                        url: targetFullUrl,
+                        pathname: new URL(targetFullUrl).pathname
+                    }, "*");
+                } catch (_) {}
+            }
+
             try {
                 if (document.body) {
                     document.body.style.opacity = "0.75";
                     document.body.style.transition = "opacity 0.15s ease";
                 }
             } catch (_) {}
-            var realWin = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
+
+            // 3. 动态原生 <a> 点击通道：在所有跨域/油猴沙箱 iframe 中原生权重最高、兼容性最强
             try {
-                realWin.location.href = url;
+                var navA = document.createElement("a");
+                navA.href = targetFullUrl;
+                navA.target = "_self";
+                navA.style.display = "none";
+                (document.body || document.documentElement).appendChild(navA);
+                navA.click();
+                setTimeout(function () {
+                    try { navA.remove(); } catch (_) {}
+                }, 300);
+            } catch (_) {}
+
+            // 4. window.location 与 unsafeWindow.location 双重通道保障
+            try {
+                window.location.href = targetFullUrl;
             } catch (err1) {
                 try {
-                    window.location.href = url;
+                    var realWin = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
+                    realWin.location.href = targetFullUrl;
                 } catch (err2) {
                     try {
-                        realWin.location.assign(url);
-                    } catch (err3) {
-                        window.location.assign(url);
-                    }
+                        window.location.assign(targetFullUrl);
+                    } catch (_) {}
                 }
             }
         }
@@ -515,6 +564,7 @@ function initRouter_Xinlvjiang() {
             if (!card) return "";
             var id = card.getAttribute("data-entrant-card") ||
                      card.getAttribute("data-player-id") ||
+                     card.getAttribute("data-profile-entrant") ||
                      card.getAttribute("data-player") ||
                      card.getAttribute("data-id");
             if (id && /^\d+$/.test(id)) return id;
@@ -552,7 +602,7 @@ function initRouter_Xinlvjiang() {
 
             var row = document.createElement("div");
             row.className = "profile-return-row";
-            row.innerHTML = '<a class="back-link" href="' + returnUrl + '">← 返回（阵容 / 选手列表）</a>';
+            row.innerHTML = '<a class="back-link" href="' + returnUrl + '">← 返回（战队阵容 / 选手列表）</a>';
             container.insertBefore(row, container.firstChild);
         }
 
@@ -574,29 +624,38 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ③ 简洁介绍弹窗（资料快览）右下角「查看详情」：点击直达该选手官方详情页，并对齐 return_to 路由
-            var actionLink = e.target.closest && e.target.closest(".profile-preview-actions a, .profile-preview-actions .button");
+            // ③ 简洁介绍弹窗（资料快览）右下角「查看详情」：点击直达该选手官方详情页，并精准拼接双层 return_to
+            var actionLink = e.target.closest && e.target.closest(".profile-preview-actions a, .profile-preview-actions .button, [data-preview-actions] a");
             if (actionLink) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
                 var rawHref = actionLink.getAttribute("href") || actionLink.href || "";
                 var m = rawHref.match(/\/players\/(\d+)/);
                 var entrantId = m && m[1] ? m[1] : "";
-                var currentReturn = encodeURIComponent(window.location.pathname + window.location.search);
+                if (!entrantId) {
+                    var dossier = actionLink.closest ? actionLink.closest("[data-profile-dialog], .profile-preview-dialog, .profile-preview-player") : null;
+                    if (dossier) entrantId = extractEntrantId(dossier);
+                }
+
+                var curSearch = getCleanSearch();
+                var currentReturn = encodeURIComponent(window.location.pathname + curSearch);
                 var destUrl = "";
                 if (entrantId) {
                     destUrl = "/players/" + entrantId + "/?event=lvjiangbeiS3&return_to=" + currentReturn;
                 } else if (rawHref) {
                     try {
                         var u = new URL(rawHref, window.location.origin);
-                        u.searchParams.set("return_to", window.location.pathname + window.location.search);
+                        u.searchParams.set("return_to", window.location.pathname + curSearch);
                         destUrl = u.pathname + u.search;
                     } catch (_) {
                         destUrl = rawHref;
                     }
                 }
+
                 if (destUrl) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+                    actionLink.href = destUrl;
+                    actionLink.target = "_self";
                     safeNavigate(destUrl);
                 }
                 return;
@@ -653,15 +712,18 @@ function initRouter_Xinlvjiang() {
             }
 
             // 2. 如果不带 data-profile-preview（如选手 players 大厅页），直接跳转该选手的官方详情介绍页
-            var playerLink = card.querySelector("a.player-card-link, a[href*='/players/']");
-            var destHref = playerLink ? (playerLink.getAttribute("href") || playerLink.href || "") : "";
-            if (!destHref) {
-                var eid = extractEntrantId(card);
-                if (eid) {
-                    var curRet = encodeURIComponent(window.location.pathname + window.location.search);
-                    destHref = "/players/" + eid + "/?event=lvjiangbeiS3&return_to=" + curRet;
-                }
+            var eid = extractEntrantId(card);
+            var destHref = "";
+            var curSearch2 = getCleanSearch();
+            var curRet2 = encodeURIComponent(window.location.pathname + curSearch2);
+
+            if (eid) {
+                destHref = "/players/" + eid + "/?event=lvjiangbeiS3&return_to=" + curRet2;
+            } else {
+                var playerLink = card.querySelector("a.player-card-link, a[href*='/players/']");
+                destHref = playerLink ? (playerLink.getAttribute("href") || playerLink.href || "") : "";
             }
+
             if (destHref) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -672,7 +734,6 @@ function initRouter_Xinlvjiang() {
             }
         }
 
-        window.addEventListener("click", handleDelegateClick, true);
         document.addEventListener("click", handleDelegateClick, true);
     }
 

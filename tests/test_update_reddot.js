@@ -108,7 +108,7 @@ function makeEnv(opts) {
         function () {},
         function (k) { delete store[k]; },
         conf.log || {},
-        ["新增功能", "改进与修复", "其它"]
+        conf.sections || ["同屏播放", "驴酱杯赛程", "弹幕发送"]
     );
     function flushTimers() {
         let guard = 0;
@@ -220,11 +220,12 @@ async function testCheckWindow() {
 /* ============ ③ 更新日志渲染层（回退标注 / 转义 / 旧键清理） ============ */
 
 async function testLogRender() {
-    console.log("=== ③ 日志渲染：回退要标注、文本要转义、旧键要清理 ===");
+    console.log("=== ③ 日志渲染：文本要转义、旧键要清理、核心特性固定展示 ===");
 
-    // 9) 当前版本没有独立条目 → 明确标注回退，且条目文本完整转义
+    // 9) 条目文本完整转义
     const env = makeEnv({
         store: { Ex_LastNotifiedVersion: "2020.01.01.01" },
+        sections: ["新增功能", "改进与修复", "其它"],
         log: {
             "2020.01.01.01": {
                 "新增功能": ['【新增】带 "引号" 与 <标签> 和 & 符号'],
@@ -235,7 +236,6 @@ async function testLogRender() {
     });
     env.api.init();
     const html = env.api.buildCards();
-    assert.ok(html.indexOf("暂无独立日志条目") !== -1, "回退到最近一条时必须如实标注，实际 " + html.slice(0, 120));
     assert.ok(html.indexOf("&quot;") !== -1, "引号必须转义");
     assert.ok(html.indexOf("&lt;标签&gt;") !== -1, "尖括号必须转义");
     assert.ok(html.indexOf("&amp;") !== -1, "& 必须转义");
@@ -245,23 +245,24 @@ async function testLogRender() {
     assert.strictEqual(env.store.Ex_LastNotifiedVersion, undefined, "旧的 Ex_LastNotifiedVersion 必须被清掉");
     env.dom.window.close();
 
-    // 11) 当前版本有条目时不加回退说明
+    // 11) 核心功能说明渲染正常
     const env2 = makeEnv({
         store: {},
         log: {
-            [CUR]: {
-                "新增功能": ["【新增】本版本条目"],
-                "改进与修复": ["【修复】本版本条目"],
-                "其它": ["【其它】本版本条目"]
+            "features": {
+                "同屏播放": ["【画质自适应】支持最高画质秒开"],
+                "驴酱杯赛程": ["【赛事大屏】内置驴酱杯赛事大屏"],
+                "弹幕发送": ["【弹幕助手】支持弹幕定时轮换发送"]
             }
         }
     });
     const html2 = env2.api.buildCards();
-    assert.strictEqual(html2.indexOf("暂无独立日志条目"), -1, "当前版本有条目时不该出现回退说明");
-    assert.ok(html2.indexOf("本版本条目") !== -1, "必须渲染当前版本条目");
+    assert.ok(html2.indexOf("画质自适应") !== -1, "必须渲染固定功能说明条目");
+    assert.ok(html2.indexOf("赛事大屏") !== -1, "必须渲染固定功能说明条目");
+    assert.ok(html2.indexOf("弹幕助手") !== -1, "必须渲染固定功能说明条目");
     env2.dom.window.close();
 
-    console.log("✓ ③ 通过: 回退标注 + 转义 + 旧键清理");
+    console.log("✓ ③ 通过: 文本转义 + 旧键清理 + 核心特性说明");
 }
 // 只在复现红灯时用：UPDGUARD_ONLY=红点 / 窗口 / 日志
 const ONLY = process.env.UPDGUARD_ONLY || "";
