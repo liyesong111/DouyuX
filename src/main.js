@@ -46,6 +46,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // @run-at       document-start
+// @allFrames    true
 // @connect      douyucdn.cn
 // @connect      douyu.com
 // @connect      qq.com

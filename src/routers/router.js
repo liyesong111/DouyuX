@@ -384,16 +384,154 @@ function initRouter_Xinlvjiang() {
             ".back-link:hover {",
             "    text-decoration: underline !important;",
             "    color: #FFAA33 !important;",
+            "}",
+            "@keyframes ex-spin {",
+            "    0% { transform: rotate(0deg); }",
+            "    100% { transform: rotate(360deg); }",
             "}"
         ].join("\n");
         (document.head || document.documentElement).appendChild(style);
     }
 
     function bindInteractions() {
+        function ensureDialog() {
+            var dlg = document.querySelector("[data-profile-dialog]");
+            if (!dlg) {
+                dlg = document.createElement("dialog");
+                dlg.className = "profile-preview-dialog";
+                dlg.setAttribute("aria-label", "资料快览");
+                dlg.setAttribute("data-profile-dialog", "");
+                dlg.innerHTML = [
+                    '<header class="profile-preview-toolbar">',
+                    '  <button type="button" class="text-link" data-preview-back hidden>← 返回阵容</button>',
+                    '  <span>资料快览</span>',
+                    '  <button type="button" class="profile-preview-close" data-preview-close aria-label="关闭资料快览">×</button>',
+                    '</header>',
+                    '<div class="profile-preview-content" data-preview-content aria-live="polite"></div>'
+                ].join("\n");
+                (document.body || document.documentElement).appendChild(dlg);
+            }
+            var closeBtn = dlg.querySelector("[data-preview-close], .profile-preview-close");
+            if (closeBtn && !closeBtn._exBound) {
+                closeBtn._exBound = true;
+                closeBtn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    if (typeof dlg.close === "function") {
+                        try { dlg.close(); } catch (_) { dlg.style.display = "none"; }
+                    } else {
+                        dlg.style.display = "none";
+                    }
+                });
+            }
+            if (!dlg._exBackdropBound) {
+                dlg._exBackdropBound = true;
+                dlg.addEventListener("click", function (e) {
+                    if (e.target === dlg) {
+                        if (typeof dlg.close === "function") {
+                            try { dlg.close(); } catch (_) { dlg.style.display = "none"; }
+                        } else {
+                            dlg.style.display = "none";
+                        }
+                    }
+                });
+            }
+            return dlg;
+        }
+
+        var cachedPreviews = {};
+
+        function showProfilePreview(endpointUrl, fallbackUrl) {
+            var dlg = ensureDialog();
+            var content = dlg.querySelector("[data-preview-content]");
+            if (!content) return;
+
+            content.innerHTML = [
+                '<div style="padding:48px 24px;text-align:center;color:#CBD5E1;font-size:15px;">',
+                '  <div style="display:inline-block;width:32px;height:32px;border:3px solid rgba(255,102,0,0.25);border-top-color:#FF6600;border-radius:50%;animation:ex-spin 0.8s linear infinite;margin-bottom:14px;"></div>',
+                '  <div style="font-weight:600;letter-spacing:0.5px;">正在加载选手资料快览与能力雷达…</div>',
+                '</div>'
+            ].join("\n");
+
+            try {
+                if (typeof dlg.showModal === "function") {
+                    if (!dlg.open) dlg.showModal();
+                } else {
+                    dlg.style.display = "block";
+                    dlg.setAttribute("open", "");
+                }
+            } catch (_) {
+                dlg.style.display = "block";
+                dlg.setAttribute("open", "");
+            }
+
+            var targetUrl = "";
+            try {
+                targetUrl = new URL(endpointUrl, location.href).href;
+            } catch (_) {
+                targetUrl = endpointUrl;
+            }
+
+            if (cachedPreviews[targetUrl]) {
+                renderPreviewHtml(cachedPreviews[targetUrl], content, fallbackUrl);
+                return;
+            }
+
+            fetch(targetUrl, { credentials: "same-origin", headers: { Accept: "text/html" } })
+                .then(function (res) {
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.text();
+                })
+                .then(function (html) {
+                    cachedPreviews[targetUrl] = html;
+                    renderPreviewHtml(html, content, fallbackUrl);
+                })
+                .catch(function (err) {
+                    var safeLink = fallbackUrl || targetUrl || location.href;
+                    content.innerHTML = [
+                        '<div style="padding:40px 24px;text-align:center;color:#CBD5E1;">',
+                        '  <p style="margin-bottom:18px;font-size:15px;">暂时无法加载选手资料快览，可直接打开完整资料页：</p>',
+                        '  <a class="button" href="' + safeLink + '" style="background:linear-gradient(135deg,#FF7700,#E65100);color:#FFFFFF;padding:10px 22px;border-radius:8px;font-weight:600;text-decoration:none;display:inline-block;box-shadow:0 4px 14px rgba(230,81,0,0.4);">打开完整资料 →</a>',
+                        '</div>'
+                    ].join("\n");
+                });
+        }
+
+        function renderPreviewHtml(html, content, fallbackUrl) {
+            content.innerHTML = html;
+            try {
+                if (window.LvjiangPlayerProfiles && typeof window.LvjiangPlayerProfiles.mount === "function") {
+                    window.LvjiangPlayerProfiles.mount(content);
+                }
+            } catch (_) {}
+
+            // 查看详情按钮点击直达
+            var detailBtn = content.querySelector(".profile-preview-actions a.button, .profile-preview-actions a");
+            if (detailBtn) {
+                detailBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    if (detailBtn.href) {
+                        location.href = detailBtn.href;
+                    }
+                });
+            }
+        }
+
         document.addEventListener("click", function (e) {
             if (!e.target) return;
-            // 点击关闭按钮、外部直播间链接、输入框等直接放行
-            if (e.target.closest && e.target.closest("button, .card-room-entry, .profile-preview-close, input, select, textarea")) return;
+            // 点击直播间跳转外链、关闭按钮、表单输入直接放行
+            if (e.target.closest && e.target.closest(".card-room-entry, .profile-preview-close, input, select, textarea")) {
+                return;
+            }
+
+            // 在快览弹窗内的点击放行
+            if (e.target.closest && e.target.closest("[data-profile-dialog]")) {
+                var actionBtn = e.target.closest(".profile-preview-actions a");
+                if (actionBtn && actionBtn.href) {
+                    e.preventDefault();
+                    location.href = actionBtn.href;
+                }
+                return;
+            }
 
             var card = e.target.closest && e.target.closest(".player-card");
             if (!card) return;
@@ -401,18 +539,20 @@ function initRouter_Xinlvjiang() {
             var link = card.querySelector("a.player-card-link") || card.querySelector("a");
             if (!link) return;
 
-            // 1. 如果带有 data-profile-preview（如阵容 teams 页）：若未点在 a 上，派发 click 触发快览弹窗
+            // 1. 如果带有 data-profile-preview（如阵容 teams 页），呼出资料快览模态框
             if (link.dataset && link.dataset.profilePreview) {
-                if (e.target !== link && !link.contains(e.target)) {
-                    e.preventDefault();
-                    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-                }
-            } else if (link.href && (!link.dataset || !link.dataset.profilePreview)) {
-                // 2. 如果是选手 catalog 页（无快览属性），点击卡片直接跳转到选手详情页
-                if (e.target !== link && !link.contains(e.target)) {
-                    e.preventDefault();
-                    location.href = link.href;
-                }
+                e.preventDefault();
+                e.stopPropagation();
+                showProfilePreview(link.dataset.profilePreview, link.href);
+                return;
+            }
+
+            // 2. 如果是选手页（players）卡片（无 data-profile-preview），点击整卡直达选手详情页
+            if (link.href) {
+                e.preventDefault();
+                e.stopPropagation();
+                location.href = link.href;
+                return;
             }
         }, true);
     }

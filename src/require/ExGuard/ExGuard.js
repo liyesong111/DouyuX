@@ -15,8 +15,26 @@
       - 不在这里碰 DOM 结构，也不做任何业务判断。
 */
 
-let ExGuard_warnCounts = {};
-const EXGUARD_WARN_MAX = 20;
+/* ⚠ 这两个用 var，不能用 let / const：
+ * 构建产物是「所有包拼进同一个作用域」的一份脚本，任何一个包只要在**自己的声明语句执行之前**
+ * 就调到 ExGuard_warn（典型：某个包的顶层 try{...}catch{ ExGuard_warn(...) }），let/const
+ * 会撞上 TDZ，抛出的是「Cannot access 'ExGuard_warnCounts' before initialization」——
+ * 这条异常没有任何兜底能接，直接把顶层脚本整根掐断，后面的 initPkg() / initRouter() 全都不执行，
+ * 用户侧只看到「插件整个不见了」，日志里只有一条看不懂的 ReferenceError。
+ * var 在脚本启动时就已经存在（值 undefined），顶层提前调用最多拿到一个空计数器，绝不再抛。
+ * 计数器因此改成惰性初始化：谁先用谁建。 */
+var EXGUARD_WARN_MAX = 20;
+
+/**
+ * 取（必要时建）告警计数器。
+ * 计数器挂在函数自己的属性上，不依赖任何顶层变量：函数声明在脚本一启动就完整存在，
+ * 所以哪怕在顶层（自己的声明语句都没走到）就被调用，这里也永远拿得到计数器 ——
+ * 既不会再撞 let / const 的 TDZ，也不会被构建期的压缩把声明摇掉。
+ */
+function ExGuard_warnCountsSafe() {
+  if (!ExGuard_warnCountsSafe.map) ExGuard_warnCountsSafe.map = {};
+  return ExGuard_warnCountsSafe.map;
+}
 
 /**
  * 有上限的告警输出。同一个 tag 超过上限后静默，避免一条坏路径刷满控制台。
@@ -26,9 +44,10 @@ const EXGUARD_WARN_MAX = 20;
  */
 function ExGuard_warn(tag, message, err) {
   const key = String(tag || "杂项");
-  const used = ExGuard_warnCounts[key] || 0;
+  const counts = ExGuard_warnCountsSafe();
+  const used = counts[key] || 0;
   if (used >= EXGUARD_WARN_MAX) return;
-  ExGuard_warnCounts[key] = used + 1;
+  counts[key] = used + 1;
   let detail = "";
   if (err) {
     const text = err && err.message ? err.message : String(err);
@@ -43,7 +62,7 @@ function ExGuard_warn(tag, message, err) {
 
 /** 已输出过多少条告警（测试用，也方便真机排查时确认没有刷屏） */
 function ExGuard_warnCount(tag) {
-  return ExGuard_warnCounts[String(tag || "杂项")] || 0;
+  return ExGuard_warnCountsSafe()[String(tag || "杂项")] || 0;
 }
 
 /** 把接口返回里"应该是数组、但可能是 undefined / 对象"的字段收敛成数组 */
@@ -55,7 +74,9 @@ function ExGuard_asList(value) {
  * 有上限的元素轮询。
  * @param {Function|string} findFn 返回目标节点（或 null）的函数；传字符串则按选择器查
  * @param {Function} onFound 命中后的回调（抛错只告警，不影响轮询收尾）
- * @param {{intervalMs?:number,maxTries?:number,tag?:string,immediate?:boolean}} [opts]
+ * @param {{intervalMs?:number,maxTries?:number,tag?:string,immediate?:boolean,quiet?:boolean}} [opts]
+ *        quiet: 这个节点本来就「可缺省」（例如只在用户点开浮层后才出现），等不到不算异常，
+ *               收工时不打 warn 只留一条 debug —— 否则真机每份文档一条「等待 10 秒」会把真问题盖住
  * @returns {{cancel:Function,done:boolean,tries:number}}
  */
 function ExGuard_pollFor(findFn, onFound, opts) {
@@ -101,7 +122,15 @@ function ExGuard_pollFor(findFn, onFound, opts) {
       state.done = true;
       stopTimer();
       const seconds = Math.round((intervalMs * maxTries) / 1000);
-      ExGuard_warn(tag, "等待目标节点 " + seconds + " 秒仍未出现，已放弃（不影响其它功能）");
+      if (config.quiet) {
+        try {
+          if (typeof console !== "undefined" && console.debug) {
+            console.debug("[DouyuEx] " + tag + "：等待目标节点 " + seconds + " 秒仍未出现（预期内可缺省，已放弃）");
+          }
+        } catch (e) {}
+      } else {
+        ExGuard_warn(tag, "等待目标节点 " + seconds + " 秒仍未出现，已放弃（不影响其它功能）");
+      }
     }
   };
 

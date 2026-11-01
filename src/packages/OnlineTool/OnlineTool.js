@@ -361,16 +361,6 @@ function createOnlineToolsPanel() {
       </div>
       <div class="fans-panel__card">
         <div class="fans-panel__card-header">
-          <span class="fans-panel__card-title">弹幕/礼物查询</span>
-        </div>
-        <div class="online-tool-actions">
-          <button type="button" class="online-tool-action-btn online-tool-monitor-btn" id="online-tool__monitor-btn">
-            <span class="online-tool-action-btn__text">查询</span>
-          </button>
-        </div>
-      </div>
-      <div class="fans-panel__card">
-        <div class="fans-panel__card-header">
           <span class="fans-panel__card-title">赛事直播间直达</span>
           <span class="online-tool-card__subtitle">16支队伍视角</span>
         </div>
@@ -381,6 +371,17 @@ function createOnlineToolsPanel() {
               '<span class="online-tool-streamer-team" data-team-id="' + s.teamId + '">' + s.team + '</span>' +
             '</a>';
           }).join("") + `
+        </div>
+      </div>
+      <div class="fans-panel__card">
+        <div class="fans-panel__card-header">
+          <span class="fans-panel__card-title">弹幕/礼物查询</span>
+          <span class="online-tool-card__subtitle" style="color: #94A3B8;">功能暂不开放</span>
+        </div>
+        <div class="online-tool-actions">
+          <button type="button" class="online-tool-action-btn online-tool-monitor-btn" id="online-tool__monitor-btn" disabled style="opacity: 0.45; cursor: not-allowed; pointer-events: none;" title="功能暂不开放，当前不可用">
+            <span class="online-tool-action-btn__text">查询（功能暂不开放）</span>
+          </button>
         </div>
       </div>
     </div>
@@ -418,6 +419,12 @@ function createOnlineToolsPanel() {
   var monitorBtn = p.querySelector("#online-tool__monitor-btn");
   if (monitorBtn) {
     monitorBtn.addEventListener("click", function (e) {
+      if ((monitorBtn.disabled || monitorBtn.getAttribute("disabled")) && e.isTrusted) {
+        // 功能暂不开放，真实点击直接拦截阻止
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       e.stopPropagation();
       openMonitorQueryPanel(monitorBtn);
     });
@@ -580,6 +587,7 @@ function createMonitorQueryPanel() {
         <button type="button" class="monitor-query__tab is-active" data-type="danmaku">弹幕查询</button>
         <button type="button" class="monitor-query__tab" data-type="gift">礼物统计</button>
       </div>
+      <div style="margin: 8px 0 12px; padding: 6px 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; color: #FCA5A5; font-size: 12px; text-align: center;">此功能暂不开放使用</div>
       <div class="monitor-query__content-danmaku">
         <div class="monitor-query__anchor-bar">
           <label class="monitor-query__anchor-label" for="monitor-query__anchor-select">主播：</label>
