@@ -89,7 +89,7 @@ console.log("✓ Case 3 通过: 自动钓鱼弹窗掩码输入与正确解锁链
 // 4. 测试驴酱杯路由分流
 const routerSrc = fs.readFileSync("src/routers/router.js", "utf8");
 
-// 场景 4.1：阵容页点击卡片唤起简洁介绍，且右下角查看详情包含双层 return_to
+// 场景 4.1：阵容页卡片点击直达该选手详情介绍页（双层 return_to 编码）
 const teamsDom = new JSDOM(`<!DOCTYPE html><html><body>
   <div class="teams-page">
     <div class="team-workspace">
@@ -119,17 +119,37 @@ const routerFn = new Function(
 
 routerFn(teamsDom.window, teamsDom.window.document, teamsDom.window.location, teamsDom.window.URL, encodeURIComponent);
 
-// 模拟点击查看详情
-const actionBtn = teamsDom.window.document.querySelector(".profile-preview-actions a");
-actionBtn.dispatchEvent(new teamsDom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+// 1. 模拟点击阵容页选手卡片：必须直达该选手官方详情页
+const teamCard = teamsDom.window.document.querySelector(".player-card");
+teamCard.dispatchEvent(new teamsDom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
 
 const expectedUrl = "/players/246/?event=lvjiangbeiS3&return_to=%2Fteams%2F50%2F%3Fevent%3DlvjiangbeiS3%26return_to%3D%252F%253Fevent%253DlvjiangbeiS3";
-assert.strictEqual(navigatedUrl, expectedUrl, "右下角查看详情点击后目标路由必须精准包含团队 return_to 编码");
-console.log("✓ Case 4 通过: 阵容页资料快览右下角查看详情路由拼接完美对齐");
+assert.strictEqual(navigatedUrl, expectedUrl, "阵容页卡片点击必须直达选手详情页且目标路由精准包含团队双层 return_to 编码");
+console.log("✓ Case 4.1 通过: 阵容页选手卡片点击直达详情页（双层 return_to 对齐）");
 
-// 场景 4.2：选手页大厅卡片点击直达详情页
+// 2. 模拟点击资料快览右下角「查看详情」
+navigatedUrl = "";
+const actionBtn = teamsDom.window.document.querySelector(".profile-preview-actions a");
+actionBtn.dispatchEvent(new teamsDom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+assert.strictEqual(navigatedUrl, expectedUrl, "资料快览右下角查看详情点击后目标路由必须精准包含团队 return_to 编码");
+console.log("✓ Case 4.2 通过: 阵容页资料快览右下角查看详情路由拼接完美对齐");
+
+// 场景 5：选手页大厅卡片点击直达详情页与筛选表单导航
 const playersDom = new JSDOM(`<!DOCTYPE html><html><body>
-  <div class="players-page">
+  <div class="players-page" data-player-catalog>
+    <form class="catalog-filter panel catalog-controls" method="get" action="/players/" data-catalog-form>
+      <input type="hidden" name="event" value="lvjiangbeiS3">
+      <input type="search" name="q" value="">
+      <select name="sort"><option value="total" selected>选手评级</option></select>
+      <select name="position">
+        <option value="">全部位置</option>
+        <option value="jungle">打野</option>
+      </select>
+      <div class="catalog-filter-actions">
+        <span class="catalog-live-status" data-catalog-status>加载失败，请重新应用筛选或稍后再试。</span>
+        <button class="catalog-submit" type="submit">筛选</button>
+      </div>
+    </form>
     <div class="catalog-results">
       <article class="player-card" data-entrant-card="264">
         <a class="player-card-link" href="/players/264/?event=lvjiangbeiS3&return_to=%2Fplayers%2F%3Fevent%3DlvjiangbeiS3">
@@ -150,10 +170,20 @@ const playerRouterFn = new Function(
 
 playerRouterFn(playersDom.window, playersDom.window.document, playersDom.window.location, playersDom.window.URL, encodeURIComponent);
 
+// 1. 验证选手卡片点击
 const playerCard = playersDom.window.document.querySelector(".player-card");
 playerCard.dispatchEvent(new playersDom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
-
 assert.strictEqual(playerNavigatedUrl, "/players/264/?event=lvjiangbeiS3&return_to=%2Fplayers%2F%3Fevent%3DlvjiangbeiS3", "选手页卡片点击直达详情页");
-console.log("✓ Case 5 通过: 选手大厅卡片点击直达详情介绍页");
+console.log("✓ Case 5.1 通过: 选手大厅卡片点击直达详情介绍页");
+
+// 2. 验证筛选表单提交与下拉框变更触发安全导航
+playerNavigatedUrl = "";
+const posSelect = playersDom.window.document.querySelector("select[name='position']");
+posSelect.value = "jungle";
+posSelect.dispatchEvent(new playersDom.window.Event("change", { bubbles: true, cancelable: true }));
+
+assert(playerNavigatedUrl.indexOf("position=jungle") !== -1, "位置筛选变更必须触发包含 position=jungle 的路由导航");
+assert(playerNavigatedUrl.indexOf("event=lvjiangbeiS3") !== -1, "位置筛选路由必须携带 event=lvjiangbeiS3");
+console.log("✓ Case 5.2 通过: 选手大厅筛选变更平滑触发安全导航并更新路由");
 
 console.log("=== 全部 5 项自动钓鱼与路由新用例 100% 通过 ===");

@@ -442,6 +442,21 @@ function initRouter_Xinlvjiang() {
             "    transform: translateY(-1px) !important;",
             "    box-shadow: 0 6px 20px rgba(184, 50, 72, 0.45) !important;",
             "}",
+            "/* 选手大厅筛选表单与提交按钮强力优化：杜绝假死与红字报错 */",
+            ".catalog-has-error .catalog-live-status {",
+            "    display: none !important;",
+            "}",
+            ".catalog-filter-actions .catalog-submit,",
+            ".catalog-submit {",
+            "    display: inline-flex !important;",
+            "    visibility: visible !important;",
+            "    opacity: 1 !important;",
+            "    cursor: pointer !important;",
+            "}",
+            ".catalog-reset,",
+            "[data-catalog-reset] {",
+            "    cursor: pointer !important;",
+            "}",
             "@keyframes ex-spin {",
             "    0% { transform: rotate(0deg); }",
             "    100% { transform: rotate(360deg); }",
@@ -610,7 +625,110 @@ function initRouter_Xinlvjiang() {
             ensureReturnBar();
         }
 
-        // 委托点击事件：精准分流「阵容简洁介绍弹窗」与「选手页直达详情」
+        function buildCatalogFilterUrl(form) {
+            if (!form) return "";
+            var basePath = form.getAttribute("action") || window.location.pathname || "/players/";
+            if (basePath.indexOf("/players") === -1) basePath = "/players/";
+            var sp = new URLSearchParams();
+            sp.set("event", "lvjiangbeiS3");
+
+            try {
+                var formData = new FormData(form);
+                formData.forEach(function (val, key) {
+                    var v = String(val || "").trim();
+                    if (!v) return;
+                    if (key === "event") return;
+                    if (key === "ascending" && v === "0") return;
+                    sp.set(key, v);
+                });
+            } catch (_) {
+                var elements = form.elements || [];
+                for (var j = 0; j < elements.length; j++) {
+                    var el = elements[j];
+                    if (!el.name || el.type === "submit" || el.name === "event") continue;
+                    var val2 = String(el.value || "").trim();
+                    if (!val2) continue;
+                    if (el.type === "checkbox") {
+                        if (el.checked) sp.set(el.name, "1");
+                    } else {
+                        sp.set(el.name, val2);
+                    }
+                }
+            }
+
+            var ascCheck = form.querySelector('input[name="ascending"][type="checkbox"]');
+            if (ascCheck) {
+                if (ascCheck.checked) sp.set("ascending", "1");
+                else sp.delete("ascending");
+            }
+
+            if (!sp.has("page_size")) {
+                sp.set("page_size", "24");
+            }
+
+            return basePath + (basePath.endsWith("/") ? "" : "/") + "?" + sp.toString();
+        }
+
+        function setupPlayerCatalogFilter() {
+            var form = document.querySelector("[data-catalog-form], .catalog-filter");
+            if (!form) return;
+
+            var workspace = form.closest("[data-player-catalog], .catalog-workspace") || document.body;
+            if (workspace && workspace.classList) {
+                workspace.classList.remove("catalog-has-error");
+            }
+            var status = document.querySelector("[data-catalog-status], .catalog-live-status");
+            if (status && (status.textContent.indexOf("失败") !== -1 || status.textContent.indexOf("超时") !== -1)) {
+                status.textContent = "";
+            }
+
+            if (form.__douyux_filter_bound) return;
+            form.__douyux_filter_bound = true;
+
+            form.addEventListener("submit", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+                var url = buildCatalogFilterUrl(form);
+                if (url) safeNavigate(url);
+            }, true);
+
+            form.addEventListener("change", function (ev) {
+                if (!ev.target) return;
+                var tag = (ev.target.tagName || "").toUpperCase();
+                if (tag === "SELECT" || (tag === "INPUT" && ev.target.type === "checkbox")) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+                    var url = buildCatalogFilterUrl(form);
+                    if (url) safeNavigate(url);
+                }
+            }, true);
+        }
+
+        function stripPreviewAttributes() {
+            try {
+                var cards = document.querySelectorAll(".player-card, [data-entrant-card], [data-player-id]");
+                for (var i = 0; i < cards.length; i++) {
+                    var card = cards[i];
+                    card.removeAttribute("data-profile-preview");
+                    card.removeAttribute("aria-haspopup");
+                    var link = card.querySelector("a.player-card-link, a[href*='/players/'], a[href*='/previews/players/']");
+                    if (link) {
+                        link.removeAttribute("data-profile-preview");
+                        link.removeAttribute("aria-haspopup");
+                        var eid = extractEntrantId(card);
+                        if (eid) {
+                            var curSearch = getCleanSearch();
+                            var curRet = encodeURIComponent(window.location.pathname + curSearch);
+                            link.setAttribute("href", "/players/" + eid + "/?event=lvjiangbeiS3&return_to=" + curRet);
+                        }
+                    }
+                }
+            } catch (_) {}
+        }
+
+        // 委托点击事件：全场景无缝分流与选手卡片直达详情
         function handleDelegateClick(e) {
             if (!e.target) return;
 
@@ -619,12 +737,84 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ② 表单输入控件、对比选择复选框放行
-            if (e.target.closest && e.target.closest("input, select, textarea, label.catalog-compare-choice, button[data-catalog-dimension-sort]")) {
+            // ② 筛选提交按钮（"筛选" / "应用筛选"）：拦截并统一走 safeNavigate 干净导航
+            var submitBtn = e.target.closest && e.target.closest(".catalog-submit, button[type='submit'], input[type='submit']");
+            if (submitBtn) {
+                var cForm = submitBtn.closest("form") || document.querySelector("[data-catalog-form], .catalog-filter");
+                if (cForm) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+                    var fUrl = buildCatalogFilterUrl(cForm);
+                    if (fUrl) safeNavigate(fUrl);
+                    return;
+                }
+            }
+
+            // ③ 筛选重置按钮：拦截并直达默认选手列表
+            var resetBtn = e.target.closest && e.target.closest(".catalog-reset, [data-catalog-reset]");
+            if (resetBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+                safeNavigate("/players/?event=lvjiangbeiS3&page_size=24");
                 return;
             }
 
-            // ③ 简洁介绍弹窗（资料快览）右下角「查看详情」：点击直达该选手官方详情页，并精准拼接双层 return_to
+            // ④ 能力维度排序按钮（KDA, 参团率, 伤害占比等）
+            var dimBtn = e.target.closest && e.target.closest("button[data-catalog-dimension-sort]");
+            if (dimBtn) {
+                var dimForm = dimBtn.closest("form") || document.querySelector("[data-catalog-form], .catalog-filter");
+                var dimVal = dimBtn.getAttribute("data-catalog-dimension-sort") || dimBtn.value || "";
+                if (dimVal && dimForm) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+                    var sortSelect = dimForm.querySelector("select[name='sort']");
+                    if (sortSelect) sortSelect.value = dimVal;
+                    var ascField = dimForm.querySelector("input[name='ascending']");
+                    if (ascField) {
+                        if (ascField.type === "checkbox") ascField.checked = false;
+                        else ascField.value = "0";
+                    }
+                    var dimUrl = buildCatalogFilterUrl(dimForm);
+                    if (dimUrl) safeNavigate(dimUrl);
+                    return;
+                }
+            }
+
+            // ⑤ 评级样式预览卡筛选链接（S+, S, A, B, C, D）
+            var gradeLink = e.target.closest && e.target.closest("[data-grade-filter], .catalog-style-card a");
+            if (gradeLink) {
+                var gHref = gradeLink.getAttribute("href") || gradeLink.href || "";
+                if (gHref) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+                    safeNavigate(gHref);
+                    return;
+                }
+            }
+
+            // ⑥ 分页链接（上一页、下一页、第N页）
+            var pageLink = e.target.closest && e.target.closest("a[data-catalog-page], nav.pagination a");
+            if (pageLink) {
+                var pHref = pageLink.getAttribute("href") || pageLink.href || "";
+                if (pHref) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+                    safeNavigate(pHref);
+                    return;
+                }
+            }
+
+            // ⑦ 表单输入文本、对比选择复选框放行交互
+            if (e.target.closest && e.target.closest("input, select, textarea, label.catalog-compare-choice")) {
+                return;
+            }
+
+            // ⑧ 简洁介绍弹窗（资料快览）右下角「查看详情」：点击直达该选手官方详情页，并精准拼接双层 return_to
             var actionLink = e.target.closest && e.target.closest(".profile-preview-actions a, .profile-preview-actions .button, [data-preview-actions] a");
             if (actionLink) {
                 var rawHref = actionLink.getAttribute("href") || actionLink.href || "";
@@ -661,7 +851,7 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ④ 选手详情页中的返回链接（← 返回战队阵容 / ← 返回选手）平滑回退
+            // ⑨ 选手详情页中的返回链接（← 返回战队阵容 / ← 返回选手）平滑回退
             var backBtn = e.target.closest && e.target.closest(".back-link, .profile-return-row a");
             if (backBtn) {
                 var backTarget = backBtn.getAttribute("href") || backBtn.href;
@@ -681,11 +871,11 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // ⑤ 处于选手卡片区域内的点击
+            // ⑩ 处于选手卡片区域内的点击：无论是阵容页还是选手大厅，一律直达该选手详情页面
             var card = e.target.closest && e.target.closest(".player-card, .catalog-player-card, [data-entrant-card], [data-player-id]");
             if (!card) return;
 
-            // 评级样式预览卡（S+, S, A... 纯卡面展示）放行，交由原站样式筛选
+            // 评级样式预览卡（S+, S, A... 纯卡面展示）放行已由上述 ⑤ 截获，未匹配则跳过
             if (card.classList && card.classList.contains("catalog-style-card")) {
                 return;
             }
@@ -695,23 +885,6 @@ function initRouter_Xinlvjiang() {
                 return;
             }
 
-            // 1. 如果带有 data-profile-preview（如阵容 teams 页），唤起简洁介绍（资料快览弹窗）
-            var previewLink = card.querySelector("a[data-profile-preview], [data-profile-preview]");
-            if (previewLink) {
-                // 若点击的就是具备 data-profile-preview 的链接，直接放行交由原站 profile-preview.js 唤起
-                if (e.target.closest("a[data-profile-preview], [data-profile-preview]")) {
-                    return;
-                }
-                // 若点击卡片其他位置（非其它 a 标签），主动触发该链接点击唤起简洁介绍
-                if (!e.target.closest("a")) {
-                    e.preventDefault();
-                    previewLink.click();
-                    return;
-                }
-                return;
-            }
-
-            // 2. 如果不带 data-profile-preview（如选手 players 大厅页），直接跳转该选手的官方详情介绍页
             var eid = extractEntrantId(card);
             var destHref = "";
             var curSearch2 = getCleanSearch();
@@ -735,6 +908,8 @@ function initRouter_Xinlvjiang() {
         }
 
         document.addEventListener("click", handleDelegateClick, true);
+        setupPlayerCatalogFilter();
+        stripPreviewAttributes();
     }
 
     applyDarkTheme();
@@ -751,10 +926,20 @@ function initRouter_Xinlvjiang() {
         });
     }
 
+    if (typeof MutationObserver !== "undefined") {
+        try {
+            var mutObserver = new MutationObserver(function () {
+                bindInteractions();
+            });
+            mutObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+        } catch (_) {}
+    }
+
     var checkCount = 0;
     var themeTimer = setInterval(function () {
         applyDarkTheme();
         injectXinlvjiangStyles();
+        bindInteractions();
         syncScheduleStateToParent();
         checkCount++;
         if (checkCount > 15) clearInterval(themeTimer);
