@@ -399,7 +399,9 @@ function initRouter_Xinlvjiang() {
         }
         suppressNativeDialog();
 
-        // 2. 统一可靠的跨域 iframe 内部导航执行器
+        // 2. 统一可靠的 iframe 内部导航执行器。
+        //    这里绝不能同时模拟 <a>.click() 与 location.assign()：前者会让原站
+        //    的快览逻辑重新收到一次 click，两个导航也会竞争，表现为白闪或停在列表。
         function safeNavigate(destUrl) {
             if (!destUrl) return;
             var fullUrl = destUrl;
@@ -408,21 +410,7 @@ function initRouter_Xinlvjiang() {
             } catch (_) {
                 fullUrl = destUrl;
             }
-
-            // 优先路线：原生 DOM <a> 锚点分发（携带用户激活上下文，穿透沙箱，iframe 内部平滑跳转）
-            try {
-                var tempLink = document.createElement("a");
-                tempLink.href = fullUrl;
-                tempLink.target = "_self";
-                tempLink.style.cssText = "display:none!important;position:absolute;left:-9999px;top:-9999px;";
-                (document.body || document.documentElement).appendChild(tempLink);
-                tempLink.click();
-                setTimeout(function () {
-                    try { if (tempLink.parentNode) tempLink.parentNode.removeChild(tempLink); } catch (_) {}
-                }, 200);
-            } catch (_) {}
-
-            // 兜底路线：标准 window.location.assign / href
+            // 只保留一次真实导航，确保详情页在当前 iframe 内打开。
             try {
                 window.location.assign(fullUrl);
             } catch (_) {
@@ -434,6 +422,35 @@ function initRouter_Xinlvjiang() {
                     } catch (_) {}
                 }
             }
+        }
+
+        function getPlayerDetailUrl(card) {
+            if (!card) return "";
+            var link = card.querySelector("a.player-card-link, a[href*='/players/']");
+            var href = link && (link.getAttribute("href") || link.href);
+            if (href && !/^\s*(?:#|javascript:)/i.test(href)) {
+                try {
+                    var parsed = new URL(href, window.location.href);
+                    if (/^\/players\/\d+\/?$/.test(parsed.pathname)) {
+                        var returnPath = window.location.pathname + window.location.search;
+                        var returnParams = new URLSearchParams(window.location.search);
+                        returnParams.delete("_t");
+                        returnPath = window.location.pathname + (returnParams.toString() ? "?" + returnParams.toString() : "");
+                        parsed.searchParams.set("event", "lvjiangbeiS3");
+                        parsed.searchParams.set("return_to", returnPath);
+                        return parsed.href;
+                    }
+                } catch (_) {}
+            }
+
+            var entrantId = card.getAttribute("data-entrant-card") ||
+                card.getAttribute("data-player-id") || card.getAttribute("data-player");
+            if (!entrantId || !/^\d+$/.test(entrantId)) return "";
+
+            var params = new URLSearchParams(window.location.search);
+            params.delete("_t");
+            var returnTo = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+            return window.location.origin + "/players/" + entrantId + "/?event=lvjiangbeiS3&return_to=" + encodeURIComponent(returnTo);
         }
 
         // 3. 剥离卡片上原站绑定的 data-profile-preview 与 aria-haspopup 属性，防止原站脚本劫持
@@ -500,8 +517,9 @@ function initRouter_Xinlvjiang() {
             } catch (_) {}
         }
 
-        // 6. 核心：捕获阶段拦截卡片点击，100% 穿透直达选手详细资料页
-        document.addEventListener("click", function (e) {
+        // 6. 必须挂在 window 捕获阶段：原站在 document 捕获阶段先开快览 dialog。
+        //    在 document 上拦截已经太晚，白色快览层会先闪一帧。
+        window.addEventListener("click", function (e) {
             if (!e.target) return;
 
             // ① 直播间跳转按钮（.card-room-entry）放行，供用户在新标签页打开主播房间
@@ -544,15 +562,7 @@ function initRouter_Xinlvjiang() {
             }
 
             // 提取目标选手详细信息 URL
-            var link = card.querySelector("a.player-card-link") || card.querySelector("a[href*='/players/']");
-            var destUrl = link ? (link.getAttribute("href") || link.href) : "";
-
-            // 如果链接未挂载 href，通过卡片的 data-entrant-card 构建官方标准直达链接
-            if (!destUrl && card.dataset && card.dataset.entrantCard) {
-                var entrantId = card.dataset.entrantCard;
-                var currentReturn = encodeURIComponent(window.location.pathname + window.location.search);
-                destUrl = "https://xinlvjiang.icu/players/" + entrantId + "/?event=lvjiangbeiS3&return_to=" + currentReturn;
-            }
+            var destUrl = getPlayerDetailUrl(card);
 
             if (destUrl) {
                 // 阻断原站对点击的错误弹窗劫持，通过安全导航器直接直达选手详细资料页
@@ -566,14 +576,10 @@ function initRouter_Xinlvjiang() {
         }, true);
 
         // 双击兜底保障：双击卡片同样直接直达选手详细资料页
-        document.addEventListener("dblclick", function (e) {
+        window.addEventListener("dblclick", function (e) {
             var card = e.target.closest && e.target.closest(".player-card");
             if (card && (!card.classList || !card.classList.contains("catalog-style-card"))) {
-                var link = card.querySelector("a.player-card-link") || card.querySelector("a[href*='/players/']");
-                var destUrl = link ? (link.getAttribute("href") || link.href) : "";
-                if (!destUrl && card.dataset && card.dataset.entrantCard) {
-                    destUrl = "https://xinlvjiang.icu/players/" + card.dataset.entrantCard + "/?event=lvjiangbeiS3";
-                }
+                var destUrl = getPlayerDetailUrl(card);
                 if (destUrl) {
                     e.preventDefault();
                     safeNavigate(destUrl);
