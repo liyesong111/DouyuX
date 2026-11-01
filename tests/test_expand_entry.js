@@ -170,18 +170,19 @@ function testNewOnlineToolsDockAndPanel() {
     assert.ok(cardTitle, "必须有卡片标题元素");
     assert.strictEqual(cardTitle.textContent.trim(), "驴酱杯", "大标题必须是「驴酱杯」");
 
-    // 检查 4 个精致快捷按钮与链接
+    // 检查 5 个精致快捷按钮与链接
     const linksWrap = panel.querySelector(".online-tool-links");
     assert.ok(linksWrap, "必须有 .online-tool-links 容器");
 
     const btns = panel.querySelectorAll(".online-tool-btn");
-    assert.strictEqual(btns.length, 4, "必须横排渲染 4 个快捷按钮");
+    assert.strictEqual(btns.length, 5, "必须横排渲染 5 个快捷按钮");
 
     const expected = [
         { text: "赛程", url: "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3" },
         { text: "阵容", url: "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3" },
         { text: "选手", url: "https://xinlvjiang.icu/players/?event=lvjiangbeiS3&page_size=20" },
-        { text: "选手榜", url: "https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" }
+        { text: "选手榜", url: "https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" },
+        { text: "直播", url: "https://xinlvjiang.icu/live/?event=lvjiangbeiS3" }
     ];
 
     expected.forEach((item, idx) => {
@@ -192,7 +193,7 @@ function testNewOnlineToolsDockAndPanel() {
     });
 
     dom.window.close();
-    console.log("✓ 场景 3 通过: 底部 Dock「在线工具」总栏目就位，弹出毛玻璃面板且包含「驴酱杯」4 项快捷导航");
+    console.log("✓ 场景 3 通过: 底部 Dock「在线工具」总栏目就位，弹出毛玻璃面板且包含「驴酱杯」5 项快捷导航（含直播）");
 }
 
 /* ------------------------------------------------------------------ */

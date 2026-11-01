@@ -45,36 +45,78 @@ function initPkg_OnlineTool_Func() {
   }
 }
 
-var LVJIANG_STREAMERS = [
-  { rid: "138243", name: "洞主", team: "洞主队", pos: "上单" },
-  { rid: "52", name: "火星包", team: "火星包队", pos: "中单" },
-  { rid: "251783", name: "银剑君", team: "银剑君队", pos: "中单" },
-  { rid: "24422", name: "pigff", team: "猪哥队", pos: "中单" },
-  { rid: "475252", name: "孙悟空", team: "猴哥队", pos: "上单" },
-  { rid: "17349", name: "冰凡", team: "冰凡队", pos: "打野" },
-  { rid: "888388", name: "大湿兄", team: "大湿兄队", pos: "打野" },
-  { rid: "3863752", name: "小甜椒", team: "小甜椒队", pos: "辅助" },
-  { rid: "108780", name: "兮饭锐雯", team: "兮饭队", pos: "中单" },
-  { rid: "1126960", name: "余小C", team: "C皇队", pos: "上单" },
-  { rid: "12306", name: "电棍", team: "电棍队", pos: "中单" },
-  { rid: "891464", name: "太原马超", team: "马超队", pos: "中单" },
-  { rid: "10902240", name: "咬人鹅", team: "咬人鹅队", pos: "下路" },
-  { rid: "2561707", name: "张顺飞", team: "张顺飞队", pos: "打野" },
-  { rid: "317422", name: "冯雨", team: "冯雨队", pos: "辅助" },
-  { rid: "4452132", name: "何二抛", team: "二抛队", pos: "上单" }
+var LVJIANG_TEAMS = [
+  { id: "49", code: "T001", name: "洞主队", captain: "洞主", pos: "上单", rid: "138243" },
+  { id: "50", code: "T002", name: "火星包队", captain: "火星包", pos: "中单", rid: "52" },
+  { id: "51", code: "T003", name: "银剑君队", captain: "银剑君", pos: "中单", rid: "251783" },
+  { id: "52", code: "T004", name: "猪哥队", captain: "pigff", pos: "中单", rid: "24422" },
+  { id: "53", code: "T005", name: "猴哥队", captain: "孙悟空", pos: "上单", rid: "475252" },
+  { id: "54", code: "T006", name: "冰凡队", captain: "冰凡", pos: "打野", rid: "17349" },
+  { id: "55", code: "T007", name: "大湿兄队", captain: "大湿兄", pos: "打野", rid: "888388" },
+  { id: "56", code: "T008", name: "小甜椒队", captain: "小甜椒", pos: "辅助", rid: "3863752" },
+  { id: "57", code: "T009", name: "兮饭队", captain: "兮饭锐雯", pos: "中单", rid: "108780" },
+  { id: "58", code: "T010", name: "C皇队", captain: "余小C", pos: "上单", rid: "1126960" },
+  { id: "59", code: "T011", name: "电棍队", captain: "电棍", pos: "中单", rid: "12306" },
+  { id: "60", code: "T012", name: "马超队", captain: "太原马超", pos: "中单", rid: "891464" },
+  { id: "61", code: "T013", name: "咬人鹅队", captain: "咬人鹅", pos: "下路", rid: "10902240" },
+  { id: "62", code: "T014", name: "张顺飞队", captain: "张顺飞", pos: "打野", rid: "2561707" },
+  { id: "63", code: "T015", name: "冯雨队", captain: "冯雨", pos: "辅助", rid: "317422" },
+  { id: "64", code: "T016", name: "二抛队", captain: "何二抛", pos: "上单", rid: "4452132" }
 ];
+
+var LVJIANG_STREAMERS = LVJIANG_TEAMS.map(function (t) {
+  return { rid: t.rid, name: t.captain, team: t.name, pos: t.pos, teamId: t.id, code: t.code };
+});
 
 var LVJIANG_PAGES = {
   schedule: { title: "赛程", url: "https://xinlvjiang.icu/schedule/?event=lvjiangbeiS3" },
   teams: { title: "阵容", url: "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3" },
   players: { title: "选手", url: "https://xinlvjiang.icu/players/?event=lvjiangbeiS3&page_size=20" },
-  leaderboards: { title: "选手榜", url: "https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" }
+  leaderboards: { title: "选手榜", url: "https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" },
+  live: { title: "直播", url: "https://xinlvjiang.icu/live/?event=lvjiangbeiS3" }
 };
 
 var currentLvjiangKey = "schedule";
+var currentLvjiangTeamId = "49";
+
+function getInitialLvjiangTeamId() {
+  var curRid = (typeof getRoomId === "function") ? String(getRoomId()) : "";
+  if (!curRid && typeof location !== "undefined") {
+    var match = location.pathname.match(/^\/(\d+)/);
+    if (match) curRid = match[1];
+  }
+  if (curRid) {
+    for (var i = 0; i < LVJIANG_TEAMS.length; i++) {
+      if (LVJIANG_TEAMS[i].rid === curRid) {
+        return LVJIANG_TEAMS[i].id;
+      }
+    }
+  }
+  return "49";
+}
+
+function updateActiveTeamChip(teamId) {
+  var modal = document.querySelector(".lvjiang-modal");
+  if (!modal) return;
+  var chips = modal.querySelectorAll(".lvjiang-modal__team-chip");
+  chips.forEach(function (chip) {
+    if (chip.getAttribute("data-team-id") === String(teamId)) {
+      chip.classList.add("is-active");
+      try {
+        chip.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      } catch (e) {}
+    } else {
+      chip.classList.remove("is-active");
+    }
+  });
+}
 
 function createLvjiangModal() {
   if (document.querySelector(".lvjiang-modal")) return;
+
+  if (!currentLvjiangTeamId) {
+    currentLvjiangTeamId = getInitialLvjiangTeamId();
+  }
 
   var backdrop = document.createElement("div");
   backdrop.className = "lvjiang-backdrop";
@@ -94,6 +136,7 @@ function createLvjiangModal() {
           <button type="button" class="lvjiang-modal__tab" data-key="teams">阵容</button>
           <button type="button" class="lvjiang-modal__tab" data-key="players">选手</button>
           <button type="button" class="lvjiang-modal__tab" data-key="leaderboards">选手榜</button>
+          <button type="button" class="lvjiang-modal__tab" data-key="live">直播</button>
         </div>
       </div>
       <div class="lvjiang-modal__actions">
@@ -106,6 +149,18 @@ function createLvjiangModal() {
         <button type="button" class="lvjiang-modal__action-btn lvjiang-modal__close-btn" title="关闭大屏 (ESC)">
           <svg class="lvjiang-modal__action-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
+      </div>
+    </div>
+    <div class="lvjiang-modal__team-bar" id="lvjiang-modal__team-bar">
+      <span class="lvjiang-modal__team-bar-title">战队阵容：</span>
+      <div class="lvjiang-modal__team-chips">
+        ` + LVJIANG_TEAMS.map(function (t) {
+          var isActive = t.id === currentLvjiangTeamId ? " is-active" : "";
+          return '<button type="button" class="lvjiang-modal__team-chip' + isActive + '" data-team-id="' + t.id + '" title="' + t.name + ' (' + t.code + ' · 队长：' + t.captain + ' · ' + t.pos + ')">' +
+            '<span class="lvjiang-modal__team-code">' + t.code + '</span>' +
+            '<span class="lvjiang-modal__team-name">' + t.name + '</span>' +
+          '</button>';
+        }).join("") + `
       </div>
     </div>
     <div class="lvjiang-modal__body">
@@ -144,6 +199,17 @@ function createLvjiangModal() {
     });
   });
 
+  var chips = modal.querySelectorAll(".lvjiang-modal__team-chip");
+  chips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var tid = chip.getAttribute("data-team-id");
+      if (!tid) return;
+      currentLvjiangTeamId = tid;
+      updateActiveTeamChip(tid);
+      loadLvjiangContent("teams", true, tid);
+    });
+  });
+
   document.addEventListener("keydown", function (e) {
     if ((e.key === "Escape" || e.keyCode === 27) && modal.classList.contains("is-open")) {
       closeModal();
@@ -151,8 +217,11 @@ function createLvjiangModal() {
   });
 }
 
-function switchLvjiangTab(key) {
+function switchLvjiangTab(key, teamId) {
   currentLvjiangKey = key;
+  if (teamId) {
+    currentLvjiangTeamId = String(teamId);
+  }
   var modal = document.querySelector(".lvjiang-modal");
   if (!modal) return;
 
@@ -165,15 +234,29 @@ function switchLvjiangTab(key) {
     }
   });
 
-  var extBtn = modal.querySelector(".lvjiang-modal__external-btn");
-  if (extBtn && LVJIANG_PAGES[key]) {
-    extBtn.href = LVJIANG_PAGES[key].url;
+  var teamBar = modal.querySelector(".lvjiang-modal__team-bar");
+  if (teamBar) {
+    if (key === "teams") {
+      teamBar.classList.add("is-visible");
+      updateActiveTeamChip(currentLvjiangTeamId);
+    } else {
+      teamBar.classList.remove("is-visible");
+    }
   }
 
-  loadLvjiangContent(key);
+  var extBtn = modal.querySelector(".lvjiang-modal__external-btn");
+  if (extBtn && LVJIANG_PAGES[key]) {
+    var pageUrl = LVJIANG_PAGES[key].url;
+    if (key === "teams") {
+      pageUrl = "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3&team=" + currentLvjiangTeamId;
+    }
+    extBtn.href = pageUrl;
+  }
+
+  loadLvjiangContent(key, false, teamId);
 }
 
-function loadLvjiangContent(key, forceReload) {
+function loadLvjiangContent(key, forceReload, teamId) {
   var modal = document.querySelector(".lvjiang-modal");
   if (!modal) return;
 
@@ -182,6 +265,16 @@ function loadLvjiangContent(key, forceReload) {
   if (!iframe || !LVJIANG_PAGES[key]) return;
 
   var targetUrl = LVJIANG_PAGES[key].url;
+  if (key === "teams") {
+    var tid = teamId || currentLvjiangTeamId || "49";
+    targetUrl = "https://xinlvjiang.icu/teams/?event=lvjiangbeiS3&team=" + tid;
+  }
+
+  var extBtn = modal.querySelector(".lvjiang-modal__external-btn");
+  if (extBtn) {
+    extBtn.href = targetUrl;
+  }
+
   if (loading) {
     loading.classList.remove("is-hidden");
     loading.style.setProperty("display", "flex", "important");
@@ -215,13 +308,18 @@ function loadLvjiangContent(key, forceReload) {
   };
 
   // 必须直接设置 iframe.src 加载原站（xinlvjiang.icu 声明了 frame-ancestors *，可跨域安全内嵌且脚本运行正常）
-  // 关键优化：每次切换标签或刷新强制附带时间戳（_t=Date.now()），彻底穿透 Edge 启发式本地磁盘缓存与 EdgeOne CDN 缓存，确保 16 队伍与最新选手数据秒级同步
+  // 关键优化：每次切换标签、切换战队或刷新强制附带时间戳（_t=Date.now()），彻底穿透 Edge 启发式本地磁盘缓存与 EdgeOne CDN 缓存，确保 16 队伍与最新选手数据秒级同步
   iframe.removeAttribute("srcdoc");
   var sep = targetUrl.indexOf("?") !== -1 ? "&" : "?";
   iframe.src = targetUrl + sep + "_t=" + Date.now();
 }
 
-function openLvjiangModal(key) {
+function openLvjiangModal(key, teamId) {
+  if (teamId) {
+    currentLvjiangTeamId = String(teamId);
+  } else if (!currentLvjiangTeamId) {
+    currentLvjiangTeamId = getInitialLvjiangTeamId();
+  }
   createLvjiangModal();
   var backdrop = document.querySelector(".lvjiang-backdrop");
   var modal = document.querySelector(".lvjiang-modal");
@@ -230,7 +328,7 @@ function openLvjiangModal(key) {
   backdrop.classList.add("is-open");
   modal.classList.add("is-open");
 
-  switchLvjiangTab(key || "schedule");
+  switchLvjiangTab(key || "schedule", teamId);
 }
 
 function createOnlineToolsPanel() {
@@ -256,6 +354,9 @@ function createOnlineToolsPanel() {
           <a href="https://xinlvjiang.icu/leaderboards/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" class="online-tool-btn" data-key="leaderboards">
             <span class="online-tool-btn__text">选手榜</span>
           </a>
+          <a href="https://xinlvjiang.icu/live/?event=lvjiangbeiS3" target="_blank" rel="noopener noreferrer" class="online-tool-btn" data-key="live">
+            <span class="online-tool-btn__text">直播</span>
+          </a>
         </div>
       </div>
       <div class="fans-panel__card">
@@ -275,9 +376,9 @@ function createOnlineToolsPanel() {
         </div>
         <div class="online-tool-streamers-grid">
           ` + LVJIANG_STREAMERS.map(function (s) {
-            return '<a href="https://www.douyu.com/' + s.rid + '" target="_blank" rel="noopener noreferrer" class="online-tool-streamer-card" title="' + s.name + '（' + s.team + ' · ' + s.pos + ' · 房间号 ' + s.rid + '）">' +
+            return '<a href="https://www.douyu.com/' + s.rid + '" target="_blank" rel="noopener noreferrer" class="online-tool-streamer-card" data-team-id="' + s.teamId + '" title="' + s.name + '（' + s.team + ' · ' + s.pos + ' · 房间号 ' + s.rid + '；点击队名直达战队阵容）">' +
               '<span class="online-tool-streamer-name">' + s.name + '</span>' +
-              '<span class="online-tool-streamer-team">' + s.team + '</span>' +
+              '<span class="online-tool-streamer-team" data-team-id="' + s.teamId + '">' + s.team + '</span>' +
             '</a>';
           }).join("") + `
         </div>
@@ -297,6 +398,21 @@ function createOnlineToolsPanel() {
       var key = btn.getAttribute("data-key") || "schedule";
       openLvjiangModal(key);
     });
+  });
+
+  var streamerCards = p.querySelectorAll(".online-tool-streamer-card");
+  streamerCards.forEach(function (card) {
+    var teamSpan = card.querySelector(".online-tool-streamer-team");
+    if (teamSpan) {
+      teamSpan.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var tid = teamSpan.getAttribute("data-team-id") || card.getAttribute("data-team-id");
+        if (tid) {
+          openLvjiangModal("teams", tid);
+        }
+      });
+    }
   });
 
   var monitorBtn = p.querySelector("#online-tool__monitor-btn");

@@ -161,14 +161,35 @@ async function main() {
     assert.ok(onlineToolsPanel, "在线工具独立面板必须已渲染（.online-tools-panel）");
     assert.ok(onlineToolsPanel.textContent.indexOf("驴酱杯") !== -1, "面板内必须包含「驴酱杯」模块标题");
     const links = onlineToolsPanel.querySelectorAll(".online-tool-btn");
-    assert.strictEqual(links.length, 4, "驴酱杯模块下方必须有 4 个快捷按钮");
+    assert.strictEqual(links.length, 5, "驴酱杯模块下方必须有 5 个快捷按钮（含直播）");
     assert.ok(onlineToolsPanel.querySelector('a[href*="xinlvjiang.icu/schedule"]'), "必须包含赛程链接");
     assert.ok(onlineToolsPanel.querySelector('a[href*="xinlvjiang.icu/teams"]'), "必须包含阵容链接");
     assert.ok(onlineToolsPanel.querySelector('a[href*="xinlvjiang.icu/players"]'), "必须包含选手链接");
     assert.ok(onlineToolsPanel.querySelector('a[href*="xinlvjiang.icu/leaderboards"]'), "必须包含选手榜链接");
+    assert.ok(onlineToolsPanel.querySelector('a[href*="xinlvjiang.icu/live"]'), "必须包含直播链接");
     links.forEach(a => {
         assert.strictEqual(a.getAttribute("target"), "_blank", "快捷按钮必须在新标签页打开（target=_blank）");
     });
+
+    // 验证驴酱杯大屏 16 支战队直达与直播 Tab
+    if (typeof win.openLvjiangModal === "function") {
+        win.openLvjiangModal("teams");
+        const lvjiangModal = win.document.querySelector(".lvjiang-modal");
+        assert.ok(lvjiangModal, "大屏模态框必须已挂载");
+        const liveTab = lvjiangModal.querySelector('.lvjiang-modal__tab[data-key="live"]');
+        assert.ok(liveTab, "大屏内必须包含「直播」Tab");
+
+        const teamChips = lvjiangModal.querySelectorAll(".lvjiang-modal__team-chip");
+        assert.strictEqual(teamChips.length, 16, "大屏阵容栏必须包含 16 支战队直达按钮");
+
+        // 模拟切换至火星包队（team 50）
+        const team50Chip = lvjiangModal.querySelector('.lvjiang-modal__team-chip[data-team-id="50"]');
+        assert.ok(team50Chip, "必须包含火星包队（team=50）的直达按钮");
+        team50Chip.dispatchEvent(new win.Event("click", { bubbles: true }));
+
+        const iframe = lvjiangModal.querySelector(".lvjiang-modal__iframe");
+        assert.ok(iframe.src.indexOf("team=50") !== -1, "切换战队后 iframe.src 必须加载 team=50 对应链接");
+    }
 
     // 验证监控室查询入口与独立查询面板
     const monitorBtn = onlineToolsPanel.querySelector("#online-tool__monitor-btn");
